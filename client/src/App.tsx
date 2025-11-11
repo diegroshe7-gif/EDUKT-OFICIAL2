@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
@@ -10,80 +10,120 @@ import Landing from "@/components/Landing";
 import TutorForm from "@/components/TutorForm";
 import StudentPortal from "@/components/StudentPortal";
 import AdminPanel from "@/components/AdminPanel";
-import avatarFemale from '@assets/generated_images/Female_tutor_profile_photo_2eb1fc5f.png';
 
 function Router() {
   const { toast } = useToast();
   const [view, setView] = useState<'landing' | 'tutor' | 'alumno' | 'admin' | null>('landing');
   
-  // todo: remove mock functionality - Mock data for prototype
-  const [approvedTutors, setApprovedTutors] = useState([
-    {
-      id: '1',
-      nombre: 'María López',
-      edad: 27,
-      email: 'maria@example.com',
-      telefono: '+52 33 1234 5678',
-      materias: 'Matemáticas, Física',
-      modalidad: 'mixta',
-      ubicacion: 'Guadalajara',
-      tarifa: 400,
-      disponibilidad: 'Lun-Mie 16:00-20:00',
-      cvUrl: 'https://example.com/cv-maria.pdf',
-      stripeAccountId: 'acct_1XYZCONNECT',
-      calLink: 'https://cal.com/marialopez/tutoria-60min',
-      bio: 'Ingeniera con 5 años de experiencia enseñando matemáticas y física.',
-      avatarUrl: avatarFemale,
-      status: 'aprobado',
-    }
-  ]);
-  const [pendingTutors, setPendingTutors] = useState<any[]>([]);
-  const [rejectedTutors, setRejectedTutors] = useState<any[]>([]);
+  const { data: approvedTutors = [], refetch: refetchApproved } = useQuery<any[]>({
+    queryKey: ['/api/tutors/approved'],
+    enabled: view === 'alumno',
+  });
 
-  const SERVICE_FEE_RATE = 0.15;
+  const { data: pendingTutors = [], refetch: refetchPending } = useQuery<any[]>({
+    queryKey: ['/api/tutors/pending'],
+    enabled: view === 'admin',
+  });
+
+  const { data: rejectedTutors = [], refetch: refetchRejected } = useQuery<any[]>({
+    queryKey: ['/api/tutors/rejected'],
+    enabled: view === 'admin',
+  });
+
+  const createTutorMutation = useMutation({
+    mutationFn: async (tutorData: any) => {
+      const response = await fetch('/api/tutors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tutorData),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to create tutor');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Perfil enviado",
+        description: "Tu perfil fue enviado para revisión. Te notificaremos al aprobarlo.",
+      });
+      setView('landing');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const approveTutorMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/tutors/${id}/approve`, {
+        method: 'PATCH',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to approve tutor');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tutors/pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tutors/approved'] });
+      toast({
+        title: "Tutor aprobado",
+        description: `${data.nombre} ha sido aprobado y ahora está visible para alumnos.`,
+      });
+    },
+  });
+
+  const rejectTutorMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/tutors/${id}/reject`, {
+        method: 'PATCH',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to reject tutor');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tutors/pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tutors/rejected'] });
+      toast({
+        title: "Tutor rechazado",
+        description: `El perfil de ${data.nombre} ha sido rechazado.`,
+        variant: "destructive",
+      });
+    },
+  });
 
   const submitTutor = (tutor: any) => {
-    setPendingTutors((p) => [...p, { ...tutor, status: 'pendiente' }]);
-    toast({
-      title: "Perfil enviado",
-      description: "Tu perfil fue enviado para revisión. Te notificaremos al aprobarlo.",
-    });
-    setView('landing');
+    createTutorMutation.mutate(tutor);
   };
 
   const approveTutor = (idx: number) => {
-    setPendingTutors((p) => {
-      const t = p[idx];
-      const rest = p.filter((_, i) => i !== idx);
-      setApprovedTutors((a) => [...a, { ...t, status: 'aprobado' }]);
-      toast({
-        title: "Tutor aprobado",
-        description: `${t.nombre} ha sido aprobado y ahora está visible para alumnos.`,
-      });
-      return rest;
-    });
+    const tutor = pendingTutors[idx];
+    if (tutor?.id) {
+      approveTutorMutation.mutate(tutor.id);
+    }
   };
 
   const rejectTutor = (idx: number) => {
-    setPendingTutors((p) => {
-      const t = p[idx];
-      const rest = p.filter((_, i) => i !== idx);
-      setRejectedTutors((r) => [...r, { ...t, status: 'rechazado' }]);
-      toast({
-        title: "Tutor rechazado",
-        description: `El perfil de ${t.nombre} ha sido rechazado.`,
-        variant: "destructive",
-      });
-      return rest;
-    });
+    const tutor = pendingTutors[idx];
+    if (tutor?.id) {
+      rejectTutorMutation.mutate(tutor.id);
+    }
   };
 
+  const SERVICE_FEE_RATE = 0.15;
   const startCheckout = async ({ tutor, hours = 1 }: { tutor: any; hours: number }) => {
     const subtotal = Number(tutor.tarifa) * hours;
     const fee = Math.round(subtotal * SERVICE_FEE_RATE);
     const total = subtotal + fee;
     
-    // todo: remove mock functionality - In production, call backend /api/checkout
+    // TODO: Implement Stripe checkout
     toast({
       title: "Pago procesado (Demo)",
       description: `Total: $${total.toLocaleString('es-MX')} MXN (Tutor: $${subtotal.toLocaleString('es-MX')} + Tarifa: $${fee.toLocaleString('es-MX')})`,
