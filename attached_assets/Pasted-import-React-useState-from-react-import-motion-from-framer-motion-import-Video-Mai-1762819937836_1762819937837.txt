@@ -1,0 +1,526 @@
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { Video, Mail, Phone, CheckCircle2, XCircle, Shield, Users } from "lucide-react";
+
+/**
+ * EDUKT Portal de Tutorías — Versión con PANEL DE ADMINISTRADOR
+ * - Pantalla inicial con logo EDUKT
+ * - Registro Tutor / Alumno / Admin
+ * - Tutor sube perfil + CV (revisión requerida)
+ * - Admin: aprueba/rechaza; al aprobar pasa al listado público
+ * - Alumno: ve solo tutores aprobados y agenda Zoom
+ * - Azul + verde
+ */
+
+const brand = { primary: "#1e90ff", secondary: "#10b981", dark: "#0b1220" };
+
+export default function EduktApp() {
+  const [view, setView] = useState(null); // "landing" | "tutor" | "alumno" | "admin"
+  const [approvedTutors, setApprovedTutors] = useState([
+    {
+      nombre: "María López",
+      edad: 27,
+      email: "maria@example.com",
+      telefono: "+52 33 1234 5678",
+      materias: "Matemáticas, Física",
+      modalidad: "mixta",
+      ubicacion: "Guadalajara",
+      tarifa: 400,
+      disponibilidad: "Lun-Mie 16:00-20:00",
+      cvUrl: "https://example.com/cv-maria.pdf",
+      stripeAccountId: "acct_1XYZCONNECT",
+      calLink: "https://cal.com/marialopez/tutoria-60min"
+    }
+  ]);
+  const [pendingTutors, setPendingTutors] = useState([]);
+  const [rejectedTutors, setRejectedTutors] = useState([]);
+  const SERVICE_FEE_RATE = 0.15; // 15% al alumno
+
+  const submitTutor = (tutor) => {
+    setPendingTutors((p) => [...p, { ...tutor, status: "pendiente" }]);
+    alert("Tu perfil fue enviado para revisión. Te notificaremos al aprobarlo.");
+    setView("landing");
+  };
+
+  const approveTutor = (idx) => {
+    setPendingTutors((p) => {
+      const t = p[idx];
+      const rest = p.filter((_, i) => i !== idx);
+      setApprovedTutors((a) => [...a, { ...t, status: "aprobado" }]);
+      return rest;
+    });
+  };
+
+  const rejectTutor = (idx) => {
+    setPendingTutors((p) => {
+      const t = p[idx];
+      const rest = p.filter((_, i) => i !== idx);
+      setRejectedTutors((r) => [...r, { ...t, status: "rechazado" }]);
+      return rest;
+    });
+  };
+
+  const startCheckout = async ({ tutor, hours = 1 }) => {
+    const subtotal = Number(tutor.tarifa) * hours;
+    const fee = Math.round(subtotal * SERVICE_FEE_RATE);
+    // En producción: llamar a tu backend /api/checkout para crear la sesión de Stripe con Connect
+    alert(`(Demo) Cobrarías $${(subtotal + fee).toLocaleString('es-MX')} MXN (tutor $${subtotal.toLocaleString('es-MX')} + fee $${fee.toLocaleString('es-MX')})`);
+  };
+
+  return (
+    <div className="min-h-screen bg-white text-slate-800">
+      {!view && <Landing onSelect={setView} />}
+      {view === "tutor" && <TutorForm onSubmit={submitTutor} onBack={() => setView(null)} />}
+      {view === "alumno" && (
+        <StudentPortal tutors={approvedTutors} onBack={() => setView(null)} onCheckout={startCheckout} />
+      )}
+      {view === "admin" && (
+        <AdminPanel
+          pending={pendingTutors}
+          approved={approvedTutors}
+          rejected={rejectedTutors}
+          onApprove={approveTutor}
+          onReject={rejectTutor}
+          onBack={() => setView(null)}
+        />
+      )}
+    </div>
+  );
+}
+  ]);
+  const [pendingTutors, setPendingTutors] = useState([]);
+  const [rejectedTutors, setRejectedTutors] = useState([]);
+  const SERVICE_FEE_RATE = 0.15; // 15% al alumno
+
+  const submitTutor = (tutor) => {
+    setPendingTutors((p) => [...p, { ...tutor, status: "pendiente" }]);
+    alert("Tu perfil fue enviado para revisión. Te notificaremos al aprobarlo.");
+    setView("landing");
+  };
+
+  const approveTutor = (idx) => {
+    setPendingTutors((p) => {
+      const t = p[idx];
+      const rest = p.filter((_, i) => i !== idx);
+      setApprovedTutors((a) => [...a, { ...t, status: "aprobado" }]);
+      return rest;
+    });
+  };
+
+  const rejectTutor = (idx) => {
+    setPendingTutors((p) => {
+      const t = p[idx];
+      const rest = p.filter((_, i) => i !== idx);
+      setRejectedTutors((r) => [...r, { ...t, status: "rechazado" }]);
+      return rest;
+    });
+  };
+
+  // --- Checkout helper (Stripe) ---
+  const startCheckout = async ({ tutor, hours = 1 }) => {
+    const subtotal = Number(tutor.tarifa) * hours;
+    const fee = Math.round(subtotal * SERVICE_FEE_RATE);
+
+    /**
+     * En producción crea un endpoint /api/checkout que haga:
+     * 1) stripe.checkout.sessions.create({
+     *    mode: 'payment',
+     *    line_items: [
+     *      { name: `Tutoria con ${tutor.nombre}`, amount: subtotal*100, currency: 'mxn', quantity: 1 },
+     *      { name: 'Tarifa EDUKT (15%)', amount: fee*100, currency: 'mxn', quantity: 1 }
+     *    ],
+     *    payment_intent_data: {
+     *      transfer_data: { destination: tutor.stripeAccountId }, // paga al tutor
+     *      application_fee_amount: fee*100 // tu comisión si prefieres split interno
+     *    },
+     *    success_url: 'https://tu-dominio.com/success',
+     *    cancel_url: 'https://tu-dominio.com/cancel'
+     *  })
+     */
+
+    alert(`(Demo) Cobrarías $${(subtotal+fee).toLocaleString('es-MX')} MXN: tutor $${subtotal.toLocaleString('es-MX')} + fee $${fee.toLocaleString('es-MX')}`);
+  };
+
+  return (
+    <div className="min-h-screen bg-white text-slate-800">
+      {!view && <Landing onSelect={setView} />}
+      {view === "tutor" && <TutorForm onSubmit={submitTutor} onBack={() => setView(null)} />}
+      {view === "alumno" && (
+        <StudentPortal tutors={approvedTutors} onBack={() => setView(null)} onCheckout={startCheckout} />
+      )}
+      {view === "admin" && (
+        <AdminPanel
+          pending={pendingTutors}
+          approved={approvedTutors}
+          rejected={rejectedTutors}
+          onApprove={approveTutor}
+          onReject={rejectTutor}
+          onBack={() => setView(null)}
+        />
+      )}
+    </div>
+  );
+}]);
+    alert("Tu perfil fue enviado para revisión. Te notificaremos al aprobarlo.");
+    setView("landing");
+  };
+
+  const approveTutor = (idx) => {
+    setPendingTutors((p) => {
+      const t = p[idx];
+      const rest = p.filter((_, i) => i !== idx);
+      setApprovedTutors((a) => [...a, { ...t, status: "aprobado" }]);
+      return rest;
+    });
+  };
+
+  const rejectTutor = (idx) => {
+    setPendingTutors((p) => {
+      const t = p[idx];
+      const rest = p.filter((_, i) => i !== idx);
+      setRejectedTutors((r) => [...r, { ...t, status: "rechazado" }]);
+      return rest;
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-white text-slate-800">
+      {!view && <Landing onSelect={setView} />}
+      {view === "tutor" && <TutorForm onSubmit={submitTutor} onBack={() => setView(null)} />}
+      {view === "alumno" && (
+        <StudentPortal tutors={approvedTutors} onBack={() => setView(null)} />
+      )}
+      {view === "admin" && (
+        <AdminPanel
+          pending={pendingTutors}
+          approved={approvedTutors}
+          rejected={rejectedTutors}
+          onApprove={approveTutor}
+          onReject={rejectTutor}
+          onBack={() => setView(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function Landing({ onSelect }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-screen text-center p-6">
+      <motion.img
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        src="/logo-edukt.png" // coloca aquí tu ruta del logo (la imagen que compartiste)
+        alt="EDUKT Logo"
+        className="h-32 w-auto mb-6"
+      />
+      <h1 className="text-4xl font-bold mb-2" style={{ color: brand.dark }}>EDUKT</h1>
+      <p className="text-slate-600 mb-6 max-w-md">
+        Portal de tutorías por hora. Clases online en Zoom o presenciales.
+      </p>
+      <div className="flex flex-wrap gap-3 justify-center">
+        <button onClick={() => onSelect("alumno")} className="px-5 py-3 rounded-xl text-white font-semibold" style={{ background: brand.primary }}>Ingresar como alumno</button>
+        <button onClick={() => onSelect("tutor")} className="px-5 py-3 rounded-xl border font-semibold">Registrarme como tutor</button>
+        <button onClick={() => onSelect("admin")} className="px-5 py-3 rounded-xl text-white font-semibold flex items-center gap-2" style={{ background: brand.secondary }}>
+          <Shield size={16}/> Admin
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TutorForm({ onSubmit, onBack }) {
+  const [form, setForm] = useState({
+    nombre: "",
+    edad: "",
+    email: "",
+    telefono: "",
+    materias: "",
+    modalidad: "online",
+    ubicacion: "",
+    tarifa: "",
+    disponibilidad: "",
+    cvUrl: "",
+    bio: "",
+    stripeAccountId: "",
+    calLink: "",
+  });
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  return (
+    <div className="max-w-2xl mx-auto py-10 px-6">
+      <button onClick={onBack} className="text-slate-500 text-sm mb-4">← Volver</button>
+      <h2 className="text-3xl font-bold mb-2">Registro de tutor</h2>
+      <p className="text-slate-600 mb-6">Tu perfil será revisado. Al aprobarse, se publicará como anuncio visible para alumnos.</p>
+      <div className="grid gap-4">
+        <input name="nombre" placeholder="Nombre completo" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="edad" placeholder="Edad" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="email" placeholder="Correo electrónico" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="telefono" placeholder="Teléfono" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="materias" placeholder="Materias (separa por coma)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <div className="grid grid-cols-2 gap-3">
+          <select name="modalidad" className="border rounded-xl px-3 py-2" onChange={handleChange}>
+            <option value="online">Online (Zoom)</option>
+            <option value="presencial">Presencial</option>
+            <option value="mixta">Mixta</option>
+          </select>
+          <input name="ubicacion" placeholder="Ubicación (si presencial)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        </div>
+        <input name="tarifa" placeholder="Tarifa por hora (MXN)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <textarea name="disponibilidad" placeholder="Disponibilidad (días y horarios)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="cvUrl" placeholder="Link a CV (Drive/URL)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <textarea name="bio" placeholder="Descripción / experiencia" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="stripeAccountId" placeholder="Stripe Connect Account ID (se llena tras onboarding)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="calLink" placeholder="Enlace de Cal.com (ej. https://cal.com/usuario/tutoria-60min)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <button onClick={() => onSubmit(form)} className="mt-2 px-4 py-3 rounded-xl text-white font-semibold" style={{ background: brand.primary }}>Enviar a revisión</button>
+      </div>
+    </div>
+  );
+});
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  return (
+    <div className="max-w-2xl mx-auto py-10 px-6">
+      <button onClick={onBack} className="text-slate-500 text-sm mb-4">← Volver</button>
+      <h2 className="text-3xl font-bold mb-2">Registro de tutor</h2>
+      <p className="text-slate-600 mb-6">Tu perfil será revisado. Al aprobarse, se publicará como anuncio visible para alumnos.</p>
+      <div className="grid gap-4">
+        <input name="nombre" placeholder="Nombre completo" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="edad" placeholder="Edad" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="email" placeholder="Correo electrónico" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="telefono" placeholder="Teléfono" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="materias" placeholder="Materias (separa por coma)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <div className="grid grid-cols-2 gap-3">
+          <select name="modalidad" className="border rounded-xl px-3 py-2" onChange={handleChange}>
+            <option value="online">Online (Zoom)</option>
+            <option value="presencial">Presencial</option>
+            <option value="mixta">Mixta</option>
+          </select>
+          <input name="ubicacion" placeholder="Ubicación (si presencial)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        </div>
+        <input name="tarifa" placeholder="Tarifa por hora (MXN)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <textarea name="disponibilidad" placeholder="Disponibilidad (días y horarios)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <input name="cvUrl" placeholder="Link a CV (Drive/URL)" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <textarea name="bio" placeholder="Descripción / experiencia" className="border rounded-xl px-3 py-2" onChange={handleChange} />
+        <button onClick={() => onSubmit(form)} className="mt-2 px-4 py-3 rounded-xl text-white font-semibold" style={{ background: brand.primary }}>Enviar a revisión</button>
+      </div>
+    </div>
+  );
+}
+
+function StudentPortal({ tutors, onBack, onCheckout }) {
+  const [open, setOpen] = useState(null);
+  const [hours, setHours] = useState(1);
+
+  return (
+    <div className="max-w-5xl mx-auto py-10 px-6">
+      <button onClick={onBack} className="text-slate-500 text-sm mb-4">← Volver</button>
+      <h2 className="text-3xl font-bold mb-4">Tutores disponibles</h2>
+      {tutors.length === 0 ? (
+        <p className="text-slate-600">Aún no hay tutores aprobados.</p>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          {tutors.map((t, i) => (
+            <motion.div key={i} initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className="border rounded-2xl p-4 shadow-sm">
+              <h3 className="font-semibold text-lg">{t.nombre}</h3>
+              <p className="text-slate-600 text-sm">{t.materias}</p>
+              <p className="text-slate-600 text-sm mt-1">{t.modalidad} · {t.ubicacion || '—'}</p>
+              <p className="text-slate-700 mt-1">Tarifa: ${t.tarifa} MXN/h</p>
+              <div className="text-xs text-slate-600 mt-2">{t.email} · {t.telefono}</div>
+              <div className="mt-3">
+                <button onClick={()=>setOpen(t)} className="w-full bg-[var(--brand-secondary)] text-white px-4 py-2 rounded-xl text-sm font-semibold">Agendar</button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={()=>setOpen(null)}>
+          <div className="bg-white max-w-3xl w-full rounded-2xl p-4" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xl font-bold">Agendar con {open.nombre}</h3>
+              <button className="border rounded-xl px-3 py-1" onClick={()=>setOpen(null)}>Cerrar</button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                {open.calLink ? (
+                  <iframe src={open.calLink} title="Calendario del tutor" className="w-full h-80 border rounded-xl" />
+                ) : (
+                  <div className="h-80 border rounded-xl flex items-center justify-center text-slate-500 text-sm">Este tutor aún no configuró Cal.com</div>
+                )}
+              </div>
+              <div className="space-y-3">
+                <label className="text-sm text-slate-600">Horas</label>
+                <div className="flex items-center gap-2">
+                  <button className="px-3 py-2 rounded-xl border" onClick={()=>setHours(h=>Math.max(1,h-1))}>-</button>
+                  <div className="px-4 py-2 rounded-xl bg-slate-50 border">{hours}</div>
+                  <button className="px-3 py-2 rounded-xl border" onClick={()=>setHours(h=>Math.min(8,h+1))}>+</button>
+                </div>
+                <p className="text-sm text-slate-600">Tras el pago, recibirás el enlace de Zoom y el contacto directo.</p>
+                <button onClick={()=>onCheckout({ tutor: open, hours })} className="w-full bg-[var(--brand-primary)] text-white px-4 py-3 rounded-xl font-semibold">Pagar y reservar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+} className="text-slate-500 text-sm mb-4">← Volver</button>
+      <h2 className="text-3xl font-bold mb-4">Tutores disponibles</h2>
+      {tutors.length === 0 ? (
+        <p className="text-slate-600">Aún no hay tutores aprobados.</p>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          {tutors.map((t, i) => (
+            <motion.div key={i} initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className="border rounded-2xl p-4 shadow-sm">
+              <h3 className="font-semibold text-lg">{t.nombre}</h3>
+              <p className="text-slate-600 text-sm">{t.materias}</p>
+              <p className="text-slate-600 text-sm mt-1">{t.modalidad} · {t.ubicacion || '—'}</p>
+              <p className="text-slate-700 mt-1">Tarifa: ${t.tarifa} MXN/h</p>
+              <div className="text-xs text-slate-600 mt-2">
+                <span>{t.email}</span> · <span>{t.telefono}</span>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button onClick={()=>setOpen(t)} className="flex-1 bg-[var(--brand-secondary)] text-white px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2"><Video size={14}/> Agendar</button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50" onClick={()=>setOpen(null)}>
+          <div className="bg-white max-w-3xl w-full rounded-2xl p-4" onClick={e=>e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xl font-bold">Agendar con {open.nombre}</h3>
+              <button className="border rounded-xl px-3 py-1" onClick={()=>setOpen(null)}>Cerrar</button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <label className="text-sm text-slate-600">Horas</label>
+                <div className="flex items-center gap-2">
+                  <button className="px-3 py-2 rounded-xl border" onClick={()=>setHours(h=>Math.max(1,h-1))}>-</button>
+                  <div className="px-4 py-2 rounded-xl bg-slate-50 border">{hours}</div>
+                  <button className="px-3 py-2 rounded-xl border" onClick={()=>setHours(h=>Math.min(8,h+1))}>+</button>
+                </div>
+                <div className="text-sm text-slate-600">Enlace Zoom se envía tras el pago.</div>
+                <button onClick={()=>onCheckout({ tutor: open, hours })} className="w-full bg-[var(--brand-primary)] text-white px-4 py-3 rounded-xl font-semibold">Pagar y reservar</button>
+              </div>
+              <div>
+                {open.calLink ? (
+                  <iframe src={open.calLink} title="Calendario del tutor" className="w-full h-80 border rounded-xl" />
+                ) : (
+                  <div className="h-80 border rounded-xl flex items-center justify-center text-slate-500 text-sm">Este tutor aún no configuró Cal.com</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+} className="text-slate-500 text-sm mb-4">← Volver</button>
+      <h2 className="text-3xl font-bold mb-4">Tutores disponibles</h2>
+      {tutors.length === 0 ? (
+        <p className="text-slate-600">Aún no hay tutores aprobados.</p>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-4">
+          {tutors.map((t, i) => (
+            <motion.div key={i} initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className="border rounded-2xl p-4 shadow-sm">
+              <h3 className="font-semibold text-lg">{t.nombre}</h3>
+              <p className="text-slate-600 text-sm">{t.materias}</p>
+              <p className="text-slate-600 text-sm mt-1">{t.modalidad} · {t.ubicacion || '—'}</p>
+              <p className="text-slate-700 mt-1">Tarifa: ${t.tarifa} MXN/h</p>
+              <div className="text-xs text-slate-600 mt-2 flex flex-col gap-1">
+                <span className="inline-flex items-center gap-1"><Mail size={14}/> {t.email}</span>
+                <span className="inline-flex items-center gap-1"><Phone size={14}/> {t.telefono}</span>
+              </div>
+              <button className="mt-3 w-full bg-[var(--brand-secondary)] text-white px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2"><Video size={14}/> Agendar por Zoom</button>
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminPanel({ pending, approved, rejected, onApprove, onReject, onBack }) {
+  return (
+    <div className="max-w-6xl mx-auto py-10 px-6">
+      <button onClick={onBack} className="text-slate-500 text-sm mb-4">← Volver</button>
+      <h2 className="text-3xl font-bold mb-6 flex items-center gap-2"><Users size={22}/> Panel de administrador</h2>
+
+      <section className="mb-8">
+        <h3 className="text-xl font-semibold mb-2">Pendientes de revisión ({pending.length})</h3>
+        {pending.length === 0 ? (
+          <p className="text-slate-600">No hay perfiles pendientes.</p>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-4">
+            {pending.map((t, i) => (
+              <div key={i} className="border rounded-2xl p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-semibold">{t.nombre} · {t.edad} años</h4>
+                    <p className="text-sm text-slate-600">{t.materias}</p>
+                    <p className="text-sm text-slate-600 mt-1">{t.modalidad} · {t.ubicacion || '—'}</p>
+                    <p className="text-sm mt-1">Tarifa: ${t.tarifa} MXN/h</p>
+                    <p className="text-sm mt-1">Disponibilidad: {t.disponibilidad || '—'}</p>
+                    {t.cvUrl && (
+                      <a href={t.cvUrl} target="_blank" className="text-sm text-[var(--brand-primary)] underline mt-1 inline-block">Ver CV</a>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={() => onApprove(i)} className="px-3 py-2 rounded-xl text-white inline-flex items-center gap-1" style={{ background: brand.secondary }}>
+                    <CheckCircle2 size={16}/> Aprobar
+                  </button>
+                  <button onClick={() => onReject(i)} className="px-3 py-2 rounded-xl border inline-flex items-center gap-1">
+                    <XCircle size={16}/> Rechazar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mb-8">
+        <h3 className="text-xl font-semibold mb-2">Aprobados ({approved.length})</h3>
+        {approved.length === 0 ? (
+          <p className="text-slate-600">Sin tutores aprobados.</p>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-4">
+            {approved.map((t, i) => (
+              <div key={i} className="border rounded-2xl p-4">
+                <h4 className="font-semibold">{t.nombre}</h4>
+                <p className="text-sm text-slate-600">{t.materias}</p>
+                <p className="text-sm text-slate-600">${t.tarifa} MXN/h</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h3 className="text-xl font-semibold mb-2">Rechazados ({rejected.length})</h3>
+        {rejected.length === 0 ? (
+          <p className="text-slate-600">Sin tutores rechazados.</p>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-4">
+            {rejected.map((t, i) => (
+              <div key={i} className="border rounded-2xl p-4 opacity-70">
+                <h4 className="font-semibold">{t.nombre}</h4>
+                <p className="text-sm text-slate-600">{t.materias}</p>
+                <p className="text-sm text-slate-600">${t.tarifa} MXN/h</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
