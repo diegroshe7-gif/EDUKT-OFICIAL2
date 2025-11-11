@@ -1,0 +1,240 @@
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, CheckCircle, XCircle, Users, Clock, FileText, ExternalLink } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import StatusBadge from "./StatusBadge";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+interface AdminPanelProps {
+  pending: any[];
+  approved: any[];
+  rejected: any[];
+  onApprove: (index: number) => void;
+  onReject: (index: number) => void;
+  onBack: () => void;
+}
+
+export default function AdminPanel({ pending, approved, rejected, onApprove, onReject, onBack }: AdminPanelProps) {
+  const stats = [
+    { label: 'Pendientes', value: pending.length, icon: Clock, color: 'text-yellow-600' },
+    { label: 'Aprobados', value: approved.length, icon: CheckCircle, color: 'text-green-600' },
+    { label: 'Total Tutores', value: approved.length + pending.length + rejected.length, icon: Users, color: 'text-primary' },
+  ];
+
+  const TutorReviewCard = ({ tutor, index, isPending }: { tutor: any; index: number; isPending: boolean }) => {
+    const initials = tutor.nombre?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || '??';
+    const materias = tutor.materias?.split(',').map((m: string) => m.trim()) || [];
+
+    return (
+      <Card className="hover-elevate" data-testid={`card-tutor-review-${index}`}>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4 flex-1 min-w-0">
+              <Avatar className="h-12 w-12">
+                <AvatarFallback className="bg-primary text-primary-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-lg" data-testid={`text-name-${index}`}>{tutor.nombre}</CardTitle>
+                <CardDescription>{tutor.edad} años • {tutor.email}</CardDescription>
+              </div>
+            </div>
+            <StatusBadge status={tutor.status || 'pendiente'} />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-muted-foreground">Teléfono</p>
+              <p className="font-medium">{tutor.telefono}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Modalidad</p>
+              <p className="font-medium capitalize">{tutor.modalidad}</p>
+            </div>
+            {tutor.ubicacion && (
+              <div>
+                <p className="text-muted-foreground">Ubicación</p>
+                <p className="font-medium">{tutor.ubicacion}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-muted-foreground">Tarifa por hora</p>
+              <p className="font-medium text-primary">${tutor.tarifa?.toLocaleString('es-MX')} MXN</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm text-muted-foreground mb-2">Materias</p>
+            <div className="flex flex-wrap gap-2">
+              {materias.map((materia: string, idx: number) => (
+                <Badge key={idx} variant="secondary">{materia}</Badge>
+              ))}
+            </div>
+          </div>
+
+          {tutor.bio && (
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Experiencia</p>
+              <p className="text-sm">{tutor.bio}</p>
+            </div>
+          )}
+
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Disponibilidad</p>
+            <p className="text-sm">{tutor.disponibilidad}</p>
+          </div>
+
+          {tutor.cvUrl && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={() => window.open(tutor.cvUrl, '_blank')}
+              data-testid={`button-view-cv-${index}`}
+            >
+              <FileText className="h-4 w-4" />
+              Ver CV
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          )}
+
+          {isPending && (
+            <div className="flex gap-2 pt-4 border-t">
+              <Button
+                variant="default"
+                className="flex-1 bg-accent hover:bg-accent text-accent-foreground gap-2"
+                onClick={() => onApprove(index)}
+                data-testid={`button-approve-${index}`}
+              >
+                <CheckCircle className="h-4 w-4" />
+                Aprobar
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1 gap-2"
+                onClick={() => onReject(index)}
+                data-testid={`button-reject-${index}`}
+              >
+                <XCircle className="h-4 w-4" />
+                Rechazar
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <Button 
+              variant="ghost" 
+              onClick={onBack}
+              className="gap-2"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Volver
+            </Button>
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'Sora, sans-serif' }}>
+              Panel de Administración
+            </h1>
+            <div className="w-[100px]" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            {stats.map((stat, idx) => {
+              const Icon = stat.icon;
+              return (
+                <Card key={idx}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">{stat.label}</p>
+                        <p className="text-2xl font-bold" data-testid={`stat-${stat.label.toLowerCase()}`}>{stat.value}</p>
+                      </div>
+                      <Icon className={`h-8 w-8 ${stat.color}`} />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <Tabs defaultValue="pending" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsTrigger value="pending" data-testid="tab-pending">
+              Pendientes ({pending.length})
+            </TabsTrigger>
+            <TabsTrigger value="approved" data-testid="tab-approved">
+              Aprobados ({approved.length})
+            </TabsTrigger>
+            <TabsTrigger value="rejected" data-testid="tab-rejected">
+              Rechazados ({rejected.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending" className="space-y-4">
+            {pending.length === 0 ? (
+              <Card>
+                <CardContent className="py-16 text-center">
+                  <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No hay tutores pendientes de revisión</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {pending.map((tutor, index) => (
+                  <TutorReviewCard key={index} tutor={tutor} index={index} isPending={true} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="approved" className="space-y-4">
+            {approved.length === 0 ? (
+              <Card>
+                <CardContent className="py-16 text-center">
+                  <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No hay tutores aprobados aún</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {approved.map((tutor, index) => (
+                  <TutorReviewCard key={index} tutor={tutor} index={index} isPending={false} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="rejected" className="space-y-4">
+            {rejected.length === 0 ? (
+              <Card>
+                <CardContent className="py-16 text-center">
+                  <XCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No hay tutores rechazados</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {rejected.map((tutor, index) => (
+                  <TutorReviewCard key={index} tutor={tutor} index={index} isPending={false} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
