@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import Checkout from "@/pages/checkout";
 
 interface StudentPortalProps {
   tutors: any[];
@@ -25,6 +26,7 @@ export default function StudentPortal({ tutors, onBack, onCheckout }: StudentPor
   const [modalidadFilter, setModalidadFilter] = useState("all");
   const [selectedTutor, setSelectedTutor] = useState<any>(null);
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [hours, setHours] = useState(1);
 
   const filteredTutors = tutors.filter(tutor => {
@@ -40,12 +42,19 @@ export default function StudentPortal({ tutors, onBack, onCheckout }: StudentPor
   };
 
   const handleConfirmCheckout = () => {
-    if (selectedTutor && onCheckout) {
-      onCheckout({ tutor: selectedTutor, hours });
-      setShowCheckoutDialog(false);
-      setSelectedTutor(null);
-      setHours(1);
-    }
+    setShowCheckoutDialog(false);
+    setShowPaymentDialog(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    setShowPaymentDialog(false);
+    setSelectedTutor(null);
+    setHours(1);
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentDialog(false);
+    setShowCheckoutDialog(true);
   };
 
   const SERVICE_FEE_RATE = 0.15;
@@ -166,11 +175,24 @@ export default function StudentPortal({ tutors, onBack, onCheckout }: StudentPor
             <Button 
               onClick={handleConfirmCheckout}
               className="bg-accent hover:bg-accent text-accent-foreground"
-              data-testid="button-confirm-payment"
+              data-testid="button-proceed-payment"
             >
-              Confirmar Pago
+              Proceder al Pago
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent className="max-w-lg" data-testid="dialog-payment">
+          {selectedTutor && (
+            <Checkout
+              tutor={selectedTutor}
+              hours={hours}
+              onSuccess={handlePaymentSuccess}
+              onCancel={handlePaymentCancel}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
