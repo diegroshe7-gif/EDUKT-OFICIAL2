@@ -25,6 +25,8 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     disponibilidad: "",
     cv_url: "",
     bio: "",
+    universidad: "",
+    foto_perfil: "",
     stripe_account_id: "",
     cal_link: "",
   });
@@ -115,6 +117,30 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                     onChange={(e) => handleChange("telefono", e.target.value)}
                     required
                     data-testid="input-telefono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="universidad">Egresado/a de</Label>
+                  <Input
+                    id="universidad"
+                    placeholder="Ej: Universidad de Guadalajara"
+                    value={formData.universidad}
+                    onChange={(e) => handleChange("universidad", e.target.value)}
+                    data-testid="input-universidad"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="foto_perfil">Foto de Perfil (URL)</Label>
+                  <Input
+                    id="foto_perfil"
+                    type="url"
+                    placeholder="https://ejemplo.com/foto.jpg"
+                    value={formData.foto_perfil}
+                    onChange={(e) => handleChange("foto_perfil", e.target.value)}
+                    data-testid="input-foto-perfil"
                   />
                 </div>
               </div>
