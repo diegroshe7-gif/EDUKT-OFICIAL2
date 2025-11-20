@@ -5,7 +5,7 @@ import { GraduationCap, Users, Shield } from "lucide-react";
 import logoUrl from '@assets/generated_images/EDUKT_platform_logo_256b6797.png';
 
 interface LandingProps {
-  onSelectRole: (role: 'alumno' | 'tutor' | 'admin') => void;
+  onSelectRole: (role: 'alumno' | 'tutor' | 'admin', action: 'register' | 'login') => void;
 }
 
 export default function Landing({ onSelectRole }: LandingProps) {
@@ -75,8 +75,7 @@ export default function Landing({ onSelectRole }: LandingProps) {
                 transition={{ duration: 0.4, delay: 0.3 + index * 0.1 }}
               >
                 <Card 
-                  className="p-8 hover-elevate cursor-pointer transition-all h-full"
-                  onClick={() => onSelectRole(role.id)}
+                  className="p-8 transition-all h-full"
                   data-testid={`card-role-${role.id}`}
                 >
                   <div className="space-y-4">
@@ -95,13 +94,31 @@ export default function Landing({ onSelectRole }: LandingProps) {
                       <h3 className="text-xl font-semibold mb-2">{role.title}</h3>
                       <p className="text-sm text-muted-foreground">{role.description}</p>
                     </div>
-                    <Button 
-                      variant={role.variant}
-                      className={`w-full ${role.id === 'admin' ? 'bg-accent hover:bg-accent text-accent-foreground' : ''}`}
-                      data-testid={`button-select-${role.id}`}
-                    >
-                      Continuar
-                    </Button>
+                    <div className="space-y-2">
+                      <Button 
+                        variant={role.variant}
+                        className={`w-full ${role.id === 'admin' ? 'bg-accent hover:bg-accent text-accent-foreground' : ''}`}
+                        onClick={() => onSelectRole(role.id, 'register')}
+                        data-testid={`button-register-${role.id}`}
+                      >
+                        {role.id === 'admin' ? 'Acceder' : 'Registrarse'}
+                      </Button>
+                      {role.id !== 'admin' && (
+                        <Button 
+                          variant="ghost"
+                          className="w-full"
+                          onClick={() => onSelectRole(role.id, 'login')}
+                          data-testid={`button-login-${role.id}`}
+                        >
+                          Ya tengo cuenta
+                        </Button>
+                      )}
+                      {role.id === 'admin' && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          Solo administradores
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </Card>
               </motion.div>
