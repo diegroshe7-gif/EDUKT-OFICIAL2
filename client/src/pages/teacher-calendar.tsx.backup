@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, User, Video, ArrowLeft } from "lucide-react";
+import { Calendar, Clock, User, Video } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Sesion, Tutor, Alumno } from "@shared/schema";
@@ -51,11 +51,9 @@ export default function TeacherCalendar({ tutorId, onBack }: TeacherCalendarProp
             onClick={onBack}
             data-testid="button-back"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver
+            ← Volver
           </Button>
         )}
-        
         <div>
           <h1 className="text-3xl font-bold">Mi Calendario</h1>
           <p className="text-muted-foreground mt-2">
@@ -63,39 +61,41 @@ export default function TeacherCalendar({ tutorId, onBack }: TeacherCalendarProp
           </p>
         </div>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Próximas Sesiones ({upcomingSesiones.length})
-          </h2>
-          
-          {upcomingSesiones.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                No tienes sesiones programadas próximamente
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {upcomingSesiones.map((sesion) => (
-                <SessionCard key={sesion.id} sesion={sesion} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {pastSesiones.length > 0 && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">
-              Sesiones Completadas ({pastSesiones.length})
-            </h2>
-            <div className="grid gap-4">
-              {pastSesiones.map((sesion) => (
-                <SessionCard key={sesion.id} sesion={sesion} isPast />
-              ))}
-            </div>
+      {/* Próximas Sesiones */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Próximas Sesiones ({upcomingSesiones.length})
+        </h2>
+        
+        {upcomingSesiones.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              No tienes sesiones programadas próximamente
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {upcomingSesiones.map((sesion) => (
+              <SessionCard key={sesion.id} sesion={sesion} />
+            ))}
           </div>
         )}
+      </div>
+
+      {/* Sesiones Pasadas */}
+      {pastSesiones.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">
+            Sesiones Completadas ({pastSesiones.length})
+          </h2>
+          <div className="grid gap-4">
+            {pastSesiones.map((sesion) => (
+              <SessionCard key={sesion.id} sesion={sesion} isPast />
+            ))}
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
