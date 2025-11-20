@@ -11,10 +11,11 @@ import TutorForm from "@/components/TutorForm";
 import AlumnoForm from "@/components/AlumnoForm";
 import StudentPortal from "@/components/StudentPortal";
 import AdminPanel from "@/components/AdminPanel";
+import TutorPortal from "@/components/TutorPortal";
 
 function Router() {
   const { toast } = useToast();
-  const [view, setView] = useState<'landing' | 'tutor' | 'alumno-registro' | 'alumno' | 'admin' | null>('landing');
+  const [view, setView] = useState<'landing' | 'tutor' | 'tutor-login' | 'alumno-registro' | 'alumno' | 'admin' | null>('landing');
   const [alumnoRegistrado, setAlumnoRegistrado] = useState<any>(null);
 
   useEffect(() => {
@@ -154,6 +155,8 @@ function Router() {
       } else {
         setView('alumno-registro');
       }
+    } else if (role === 'tutor') {
+      setView('tutor-login');
     } else {
       setView(role as any);
     }
@@ -191,6 +194,7 @@ function Router() {
       <Route path="/">
         {view === 'landing' && <Landing onSelectRole={handleSelectRole} />}
         {view === 'tutor' && <TutorForm onSubmit={submitTutor} onBack={() => setView('landing')} />}
+        {view === 'tutor-login' && <TutorPortal onBack={() => setView('landing')} />}
         {view === 'alumno-registro' && (
           <AlumnoForm 
             onSubmit={submitAlumno} 
