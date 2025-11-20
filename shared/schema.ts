@@ -8,6 +8,7 @@ export const tutors = pgTable("tutors", {
   nombre: text("nombre").notNull(),
   edad: integer("edad").notNull(),
   email: text("email").notNull().unique(),
+  password: text("password").notNull(),
   telefono: text("telefono").notNull(),
   materias: text("materias").notNull(),
   modalidad: text("modalidad").notNull(),
@@ -27,6 +28,7 @@ export const tutors = pgTable("tutors", {
 export const insertTutorSchema = createInsertSchema(tutors, {
   edad: z.coerce.number().int().positive(),
   tarifa: z.coerce.number().int().positive(),
+  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
 }).omit({
   id: true,
   createdAt: true,
@@ -56,11 +58,13 @@ export const alumnos = pgTable("alumnos", {
   apellido: text("apellido").notNull(),
   edad: integer("edad").notNull(),
   email: text("email").notNull().unique(),
+  password: text("password").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertAlumnoSchema = createInsertSchema(alumnos, {
   edad: z.coerce.number().int().positive(),
+  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
 }).omit({
   id: true,
   createdAt: true,

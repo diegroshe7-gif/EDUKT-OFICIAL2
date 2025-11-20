@@ -21,6 +21,7 @@ export interface IStorage {
   
   createTutor(tutor: InsertTutor): Promise<Tutor>;
   getTutorById(id: string): Promise<Tutor | undefined>;
+  getTutorByEmail(email: string): Promise<Tutor | undefined>;
   getTutorsByStatus(status: string): Promise<Tutor[]>;
   updateTutorStatus(id: string, status: string): Promise<Tutor | undefined>;
   getAllApprovedTutors(): Promise<Tutor[]>;
@@ -68,6 +69,11 @@ export class DbStorage implements IStorage {
 
   async getTutorById(id: string): Promise<Tutor | undefined> {
     const result = await db.select().from(tutors).where(eq(tutors.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTutorByEmail(email: string): Promise<Tutor | undefined> {
+    const result = await db.select().from(tutors).where(eq(tutors.email, email)).limit(1);
     return result[0];
   }
 
