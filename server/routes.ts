@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTutorSchema } from "@shared/schema";
+import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReviewSchema } from "@shared/schema";
 import { z } from "zod";
 import Stripe from "stripe";
 
@@ -141,6 +141,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         error: "Error creating payment intent: " + error.message 
       });
+    }
+  });
+
+  // Alumno routes
+  app.post("/api/alumnos", async (req, res) => {
+    try {
+      const validatedData = insertAlumnoSchema.parse(req.body);
+      
+      const existing = await storage.getAlumnoByEmail(validatedData.email);
+      if (existing) {
+        return res.status(409).json({ error: "Email already registered" });
+      }
+      
+      const alumno = await storage.createAlumno(validatedData);
+      res.json(alumno);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid alumno data", details: error.errors });
+      } else {
+        console.error("Error creating alumno:", error);
+        res.status(500).json({ error: "Failed to create alumno" });
+      }
+    }
+  });
+
+  app.get("/api/alumnos/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const alumno = await storage.getAlumnoById(id);
+      if (!alumno) {
+        return res.status(404).json({ error: "Alumno not found" });
+      }
+      res.json(alumno);
+    } catch (error) {
+      console.error("Error fetching alumno:", error);
+      res.status(500).json({ error: "Failed to fetch alumno" });
+    }
+  });
+
+  // Sesion routes
+  app.post("/api/sesiones", async (req, res) => {
+    try {
+      const validatedData = insertSesionSchema.parse(req.body);
+      const sesion = await storage.createSesion(validatedData);
+      res.json(sesion);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid sesion data", details: error.errors });
+      } else {
+        console.error("Error creating sesion:", error);
+        res.status(500).json({ error: "Failed to create sesion" });
+      }
+    }
+  });
+
+  app.get("/api/sesiones/tutor/:tutorId", async (req, res) => {
+    try {
+      const { tutorId } = req.params;
+      const sesiones = await storage.getSesionesByTutor(tutorId);
+      res.json(sesiones);
+    } catch (error) {
+      console.error("Error fetching tutor sesiones:", error);
+      res.status(500).json({ error: "Failed to fetch sesiones" });
+    }
+  });
+
+  app.get("/api/sesiones/alumno/:alumnoId", async (req, res) => {
+    try {
+      const { alumnoId } = req.params;
+      const sesiones = await storage.getSesionesByAlumno(alumnoId);
+      res.json(sesiones);
+    } catch (error) {
+      console.error("Error fetching alumno sesiones:", error);
+      res.status(500).json({ error: "Failed to fetch sesiones" });
+    }
+  });
+
+  // Review routes
+  app.post("/api/reviews", async (req, res) => {
+    try {
+      const validatedData = insertReviewSchema.parse(req.body);
+      const review = await storage.createReview(validatedData);
+      res.json(review);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid review data", details: error.errors });
+      } else {
+        console.error("Error creating review:", error);
+        res.status(500).json({ error: "Failed to create review" });
+      }
+    }
+  });
+
+  app.get("/api/reviews/tutor/:tutorId", async (req, res) => {
+    try {
+      const { tutorId } = req.params;
+      const reviews = await storage.getReviewsByTutor(tutorId);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      res.status(500).json({ error: "Failed to fetch reviews" });
+    }
+  });
+
+  app.get("/api/tutors/:id/rating", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const rating = await storage.getAverageRatingForTutor(id);
+      res.json({ rating });
+    } catch (error) {
+      console.error("Error fetching tutor rating:", error);
+      res.status(500).json({ error: "Failed to fetch rating" });
     }
   });
 
