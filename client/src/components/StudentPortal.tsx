@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Search, Filter } from "lucide-react";
+import { ArrowLeft, Search, Filter, User } from "lucide-react";
 import TutorCard from "./TutorCard";
 import {
   Dialog,
@@ -19,9 +19,10 @@ interface StudentPortalProps {
   tutors: any[];
   onBack: () => void;
   onCheckout?: (params: { tutor: any; hours: number }) => void;
+  alumno?: any;
 }
 
-export default function StudentPortal({ tutors, onBack, onCheckout }: StudentPortalProps) {
+export default function StudentPortal({ tutors, onBack, onCheckout, alumno }: StudentPortalProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [modalidadFilter, setModalidadFilter] = useState("all");
   const [selectedTutor, setSelectedTutor] = useState<any>(null);
@@ -57,7 +58,7 @@ export default function StudentPortal({ tutors, onBack, onCheckout }: StudentPor
     setShowCheckoutDialog(true);
   };
 
-  const SERVICE_FEE_RATE = 0.15;
+  const SERVICE_FEE_RATE = 0.08;
   const subtotal = selectedTutor ? Number(selectedTutor.tarifa) * hours : 0;
   const fee = Math.round(subtotal * SERVICE_FEE_RATE);
   const total = subtotal + fee;
@@ -79,7 +80,12 @@ export default function StudentPortal({ tutors, onBack, onCheckout }: StudentPor
             <h1 className="text-2xl font-bold" style={{ fontFamily: 'Sora, sans-serif' }}>
               Encuentra tu Tutor
             </h1>
-            <div className="w-[100px]" />
+            {alumno && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-alumno-nombre">
+                <User className="h-4 w-4" />
+                <span>{alumno.nombre} {alumno.apellido}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col md:flex-row gap-3">
@@ -158,7 +164,7 @@ export default function StudentPortal({ tutors, onBack, onCheckout }: StudentPor
                 <span className="font-semibold">${subtotal.toLocaleString('es-MX')} MXN</span>
               </div>
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Tarifa de servicio (15%)</span>
+                <span>Tarifa de servicio (8%)</span>
                 <span>${fee.toLocaleString('es-MX')} MXN</span>
               </div>
               <div className="border-t pt-2 mt-2 flex justify-between font-bold text-lg">
@@ -185,10 +191,11 @@ export default function StudentPortal({ tutors, onBack, onCheckout }: StudentPor
 
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="max-w-lg" data-testid="dialog-payment">
-          {selectedTutor && (
+          {selectedTutor && alumno && (
             <Checkout
               tutor={selectedTutor}
               hours={hours}
+              alumno={alumno}
               onSuccess={handlePaymentSuccess}
               onCancel={handlePaymentCancel}
             />
