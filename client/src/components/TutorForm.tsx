@@ -26,7 +26,7 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     cv_url: "",
     bio: "",
     universidad: "",
-    foto_perfil: "",
+    fotoPerfil: "",
     stripe_account_id: "",
     cal_link: "",
   });
@@ -133,13 +133,13 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="foto_perfil">Foto de Perfil (URL)</Label>
+                  <Label htmlFor="fotoPerfil">Foto de Perfil (URL)</Label>
                   <Input
-                    id="foto_perfil"
+                    id="fotoPerfil"
                     type="url"
                     placeholder="https://ejemplo.com/foto.jpg"
-                    value={formData.foto_perfil}
-                    onChange={(e) => handleChange("foto_perfil", e.target.value)}
+                    value={formData.fotoPerfil}
+                    onChange={(e) => handleChange("fotoPerfil", e.target.value)}
                     data-testid="input-foto-perfil"
                   />
                 </div>

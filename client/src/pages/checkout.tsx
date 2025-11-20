@@ -94,11 +94,12 @@ const CheckoutForm = ({ tutorName, onSuccess, onCancel }: CheckoutFormProps) => 
 interface CheckoutProps {
   tutor: any;
   hours: number;
+  alumno: any;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export default function Checkout({ tutor, hours, onSuccess, onCancel }: CheckoutProps) {
+export default function Checkout({ tutor, hours, alumno, onSuccess, onCancel }: CheckoutProps) {
   const [clientSecret, setClientSecret] = useState("");
   const [amount, setAmount] = useState(0);
   const [error, setError] = useState("");
