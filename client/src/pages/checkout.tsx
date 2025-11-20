@@ -7,9 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
-const stripePublicKey = import.meta.env.VITE_TESTING_STRIPE_PUBLIC_KEY || import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-const stripePromise = stripePublicKey
-  ? loadStripe(stripePublicKey)
+const stripePromise = import.meta.env.VITE_STRIPE_PUBLIC_KEY 
+  ? loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY)
   : null;
 
 interface CheckoutFormProps {
@@ -105,8 +104,7 @@ export default function Checkout({ tutor, hours, onSuccess, onCancel }: Checkout
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const publicKey = import.meta.env.VITE_TESTING_STRIPE_PUBLIC_KEY || import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-    if (!publicKey) {
+    if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
       setError("Stripe no está configurado. Por favor contacta al administrador.");
       return;
     }

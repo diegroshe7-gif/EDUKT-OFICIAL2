@@ -5,9 +5,8 @@ import { insertTutorSchema } from "@shared/schema";
 import { z } from "zod";
 import Stripe from "stripe";
 
-const stripeKey = process.env.TESTING_STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-const stripe = stripeKey
-  ? new Stripe(stripeKey, { apiVersion: "2025-10-29.clover" })
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-10-29.clover" })
   : null;
 
 export async function registerRoutes(app: Express): Promise<Server> {

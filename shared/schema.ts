@@ -22,7 +22,10 @@ export const tutors = pgTable("tutors", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertTutorSchema = createInsertSchema(tutors).omit({
+export const insertTutorSchema = createInsertSchema(tutors, {
+  edad: z.coerce.number().int().positive(),
+  tarifa: z.coerce.number().int().positive(),
+}).omit({
   id: true,
   createdAt: true,
   status: true,
