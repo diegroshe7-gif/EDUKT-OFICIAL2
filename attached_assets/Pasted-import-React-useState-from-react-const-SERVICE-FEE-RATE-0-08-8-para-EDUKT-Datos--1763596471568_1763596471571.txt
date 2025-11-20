@@ -1,0 +1,930 @@
+import React, { useState } from "react";
+
+const SERVICE_FEE_RATE = 0.08; // 8% para EDUKT
+
+// Datos de ejemplo de tutores
+const initialTutors = [
+  {
+    id: "t1",
+    nombre: "María",
+    apellido: "López",
+    edad: 26,
+    materias: ["Matemáticas", "Física"],
+    universidad: "UP Guadalajara",
+    fotoUrl: "https://i.pravatar.cc/150?img=47",
+    tarifaHora: 400,
+    online: true,
+    presencial: true,
+    isDisponible: true,
+    ratingPromedio: 4.8,
+    reviews: [
+      { alumno: "Carlos", rating: 5, comentario: "Explica súper claro." },
+      { alumno: "Ana", rating: 4, comentario: "Muy paciente y organizada." },
+    ],
+    sesiones: [], // aquí se van guardando las clases agendadas
+  },
+  {
+    id: "t2",
+    nombre: "Diego",
+    apellido: "Fernández",
+    edad: 30,
+    materias: ["Inglés"],
+    universidad: "ITESO",
+    fotoUrl: "https://i.pravatar.cc/150?img=12",
+    tarifaHora: 350,
+    online: true,
+    presencial: false,
+    isDisponible: false, // este NO está disponible
+    ratingPromedio: 4.5,
+    reviews: [],
+    sesiones: [],
+  },
+];
+
+function App() {
+  const [view, setView] = useState("landing"); // landing | registroAlumno | alumno | tutorPanel
+  const [alumno, setAlumno] = useState(null);
+  const [tutores, setTutores] = useState(initialTutors);
+  const [tutorSeleccionado, setTutorSeleccionado] = useState(null);
+  const [reservaEnCurso, setReservaEnCurso] = useState(null); // { tutorId, fechaHora, horas }
+  const [sesionParaCalificar, setSesionParaCalificar] = useState(null); // { tutorId, sesionId }
+
+  // Registro alumno
+  const handleRegistroAlumno = (datos) => {
+    setAlumno({
+      id: "a1", // en producción lo saca de la BD
+      ...datos,
+    });
+    setView("alumno");
+  };
+
+  // Abrir modal de reserva
+  const handleAbrirReserva = (tutor) => {
+    if (!alumno) {
+      alert("Regístrate o inicia sesión como alumno antes de reservar.");
+      return;
+    }
+    if (!tutor.isDisponible) {
+      alert("Este tutor actualmente no está disponible.");
+      return;
+    }
+    setTutorSeleccionado(tutor);
+  };
+
+  // Simular pago con Stripe + creación de clase + Google Calendar
+  const handleConfirmarReserva = ({ tutor, fechaHora, horas }) => {
+    if (!fechaHora) {
+      alert("Selecciona fecha y hora.");
+      return;
+    }
+    const montoTutor = tutor.tarifaHora * horas;
+    const serviceFee = Math.round(montoTutor * SERVICE_FEE_RATE);
+    const total = montoTutor + serviceFee;
+
+    // Aquí iría la integración REAL con Stripe (checkout) y Google Calendar.
+    // Por ahora simulamos el pago y la creación de la clase:
+    alert(
+      `Pago simulado con Stripe:\n\nTutor recibe: $${montoTutor} MXN\nEDUKT (8%): $${serviceFee} MXN\nTotal alumno: $${total} MXN\n\nSe ha enviado (simulado) la invitación por Google Calendar con link de Zoom al tutor y al alumno.`
+    );
+
+    // Guardar la sesión en el tutor
+    const nuevaSesion = {
+      id: `s-${Date.now()}`,
+      alumnoNombre: `${alumno.nombre} ${alumno.apellido}`,
+      fechaHora,
+      horas,
+      estado: "pendienteCalificacion", // el alumno la debe calificar
+    };
+
+    const tutoresActualizados = tutores.map((t) => {
+      if (t.id === tutor.id) {
+        return {
+          ...t,
+          sesiones: [...t.sesiones, nuevaSesion],
+        };
+      }
+      return t;
+    });
+
+    setTutores(tutoresActualizados);
+    setReservaEnCurso(nuevaSesion);
+    setTutorSeleccionado(null);
+
+    // Podríamos mostrar opción al alumno para calificar al final
+    setSesionParaCalificar({ tutorId: tutor.id, sesionId: nuevaSesion.id });
+  };
+
+  // Cambiar disponibilidad del tutor (desde panel)
+  const handleToggleDisponibilidadTutor = (tutorId) => {
+    const actualizado = tutores.map((t) =>
+      t.id === tutorId ? { ...t, isDisponible: !t.isDisponible } : t
+    );
+    setTutores(actualizado);
+  };
+
+  // Guardar rating y comentario
+  const handleGuardarReview = ({ tutorId, sesionId, rating, comentario }) => {
+    const tutoresActualizados = tutores.map((t) => {
+      if (t.id === tutorId) {
+        const nuevasReviews = [
+          ...t.reviews,
+          {
+            alumno: `${alumno.nombre} ${alumno.apellido}`,
+            rating,
+            comentario,
+          },
+        ];
+        const nuevoPromedio =
+          nuevasReviews.reduce((sum, r) => sum + r.rating, 0) /
+          nuevasReviews.length;
+
+        const nuevasSesiones = t.sesiones.map((s) =>
+          s.id === sesionId ? { ...s, estado: "calificada" } : s
+        );
+
+        return {
+          ...t,
+          reviews: nuevasReviews,
+          ratingPromedio: nuevoPromedio,
+          sesiones: nuevasSesiones,
+        };
+      }
+      return t;
+    });
+
+    setTutores(tutoresActualizados);
+    setSesionParaCalificar(null);
+    alert("¡Gracias por calificar tu clase! La reseña se agregó al perfil de la maestra.");
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f3f4f6", fontFamily: "system-ui, sans-serif" }}>
+      {view === "landing" && (
+        <Landing
+          onAlumno={() => setView("registroAlumno")}
+          onTutorPanel={() => setView("tutorPanel")}
+        />
+      )}
+
+      {view === "registroAlumno" && (
+        <RegistroAlumno
+          onBack={() => setView("landing")}
+          onSubmit={handleRegistroAlumno}
+        />
+      )}
+
+      {view === "alumno" && alumno && (
+        <ListadoTutores
+          alumno={alumno}
+          tutores={tutores}
+          onBack={() => {
+            setView("landing");
+            setAlumno(null);
+          }}
+          onReservar={handleAbrirReserva}
+        />
+      )}
+
+      {view === "tutorPanel" && (
+        <PanelTutor
+          tutores={tutores}
+          onBack={() => setView("landing")}
+          onToggleDisponibilidad={handleToggleDisponibilidadTutor}
+        />
+      )}
+
+      {tutorSeleccionado && (
+        <ModalReserva
+          tutor={tutorSeleccionado}
+          alumno={alumno}
+          onClose={() => setTutorSeleccionado(null)}
+          onConfirm={handleConfirmarReserva}
+        />
+      )}
+
+      {sesionParaCalificar && alumno && (
+        <ModalReview
+          sesionInfo={sesionParaCalificar}
+          tutores={tutores}
+          onClose={() => setSesionParaCalificar(null)}
+          onSave={handleGuardarReview}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------- Componentes ----------
+
+function Landing({ onAlumno, onTutorPanel }) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        padding: "1.5rem",
+      }}
+    >
+      <img
+        src="/logo-edukt.png"
+        alt="EDUKT"
+        style={{ height: "96px", marginBottom: "16px" }}
+      />
+      <h1 style={{ fontSize: "2.5rem", fontWeight: "800", color: "#111827" }}>
+        EDUKT
+      </h1>
+      <p style={{ color: "#4b5563", marginTop: "8px", maxWidth: "380px" }}>
+        Portal de tutorías por hora. Regístrate como alumno, elige a tu tutora y
+        paga seguro. Clases por Zoom y calendario organizado.
+      </p>
+      <div style={{ marginTop: "24px", display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
+        <button
+          onClick={onAlumno}
+          style={{
+            padding: "10px 20px",
+            borderRadius: "999px",
+            border: "none",
+            background: "#2563eb",
+            color: "white",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Soy alumno
+        </button>
+        <button
+          onClick={onTutorPanel}
+          style={{
+            padding: "10px 20px",
+            borderRadius: "999px",
+            border: "1px solid #d1d5db",
+            background: "white",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Panel de tutora (demo)
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RegistroAlumno({ onBack, onSubmit }) {
+  const [form, setForm] = useState({
+    nombre: "",
+    apellido: "",
+    edad: "",
+    email: "",
+  });
+
+  const handleChange = (e) =>
+    setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleEnviar = () => {
+    if (!form.nombre || !form.apellido || !form.edad || !form.email) {
+      alert("Completa todos los campos.");
+      return;
+    }
+    onSubmit(form);
+  };
+
+  return (
+    <div style={{ maxWidth: "480px", margin: "0 auto", padding: "2rem 1.5rem" }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: "none",
+          border: "none",
+          color: "#6b7280",
+          fontSize: "0.875rem",
+          cursor: "pointer",
+          marginBottom: "0.75rem",
+        }}
+      >
+        ← Volver
+      </button>
+      <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>
+        Registro de alumno
+      </h2>
+      <p style={{ color: "#6b7280", fontSize: "0.9rem", marginBottom: "1.25rem" }}>
+        Registra tus datos para poder ver los perfiles de tutores y agendar tus
+        clases.
+      </p>
+      <div style={{ display: "grid", gap: "0.75rem" }}>
+        <input
+          name="nombre"
+          placeholder="Nombre"
+          onChange={handleChange}
+          style={inputStyle}
+        />
+        <input
+          name="apellido"
+          placeholder="Apellido"
+          onChange={handleChange}
+          style={inputStyle}
+        />
+        <input
+          name="edad"
+          placeholder="Edad"
+          onChange={handleChange}
+          style={inputStyle}
+        />
+        <input
+          name="email"
+          placeholder="Correo electrónico"
+          onChange={handleChange}
+          style={inputStyle}
+        />
+        <button
+          onClick={handleEnviar}
+          style={{
+            marginTop: "8px",
+            padding: "10px 16px",
+            borderRadius: "999px",
+            border: "none",
+            background: "#2563eb",
+            color: "white",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          Registrarme y ver tutores
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ListadoTutores({ alumno, tutores, onBack, onReservar }) {
+  return (
+    <div style={{ maxWidth: "960px", margin: "0 auto", padding: "2rem 1.5rem" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: "1rem",
+          fontSize: "0.9rem",
+        }}
+      >
+        <button
+          onClick={onBack}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#6b7280",
+            cursor: "pointer",
+          }}
+        >
+          ← Salir
+        </button>
+        <div style={{ color: "#4b5563" }}>
+          Alumno:{" "}
+          <strong>
+            {alumno.nombre} {alumno.apellido}
+          </strong>
+        </div>
+      </div>
+      <h2 style={{ fontSize: "1.75rem", fontWeight: 700, marginBottom: "1rem" }}>
+        Tutores disponibles
+      </h2>
+      <div
+        style={{
+          display: "grid",
+          gap: "1rem",
+          gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
+        }}
+      >
+        {tutores.map((tutor) => (
+          <TutorCard key={tutor.id} tutor={tutor} onReservar={onReservar} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TutorCard({ tutor, onReservar }) {
+  const disponible = tutor.isDisponible;
+
+  const promedio = tutor.ratingPromedio
+    ? tutor.ratingPromedio.toFixed(1)
+    : "—";
+
+  return (
+    <div
+      style={{
+        background: "white",
+        borderRadius: "1rem",
+        border: "1px solid #e5e7eb",
+        padding: "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+      }}
+    >
+      <div style={{ display: "flex", gap: "0.75rem" }}>
+        <img
+          src={tutor.fotoUrl}
+          alt={tutor.nombre}
+          style={{
+            height: "64px",
+            width: "64px",
+            borderRadius: "0.75rem",
+            objectFit: "cover",
+          }}
+        />
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontWeight: 600,
+              color: "#111827",
+              fontSize: "1rem",
+              marginBottom: "0.1rem",
+            }}
+          >
+            {tutor.nombre} {tutor.apellido} · {tutor.edad}
+          </div>
+          <div style={{ fontSize: "0.85rem", color: "#4b5563" }}>
+            {tutor.materias.join(", ")}
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "0.1rem" }}>
+            Egresada de {tutor.universidad}
+          </div>
+          <div style={{ fontSize: "0.8rem", color: "#374151", marginTop: "0.2rem" }}>
+            ⭐ {promedio}
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontWeight: 600, color: "#111827" }}>
+            ${tutor.tarifaHora} MXN/h
+          </div>
+          <span
+            style={{
+              display: "inline-block",
+              marginTop: "0.25rem",
+              padding: "2px 8px",
+              borderRadius: "999px",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              background: disponible ? "#d1fae5" : "#e5e7eb",
+              color: disponible ? "#047857" : "#4b5563",
+            }}
+          >
+            {disponible ? "Disponible" : "No disponible"}
+          </span>
+        </div>
+      </div>
+      <div style={{ fontSize: "0.75rem", color: "#6b7280", minHeight: "2rem" }}>
+        {tutor.reviews.length > 0
+          ? `“${tutor.reviews[0].comentario}”`
+          : "Aún sin comentarios."}
+      </div>
+      <button
+        disabled={!disponible}
+        onClick={() => disponible && onReservar(tutor)}
+        style={{
+          marginTop: "0.25rem",
+          padding: "8px 12px",
+          borderRadius: "999px",
+          border: "none",
+          background: disponible ? "#059669" : "#9ca3af",
+          color: "white",
+          fontWeight: 600,
+          fontSize: "0.9rem",
+          cursor: disponible ? "pointer" : "not-allowed",
+        }}
+      >
+        Agendar clase
+      </button>
+    </div>
+  );
+}
+
+function ModalReserva({ tutor, alumno, onClose, onConfirm }) {
+  const [fechaHora, setFechaHora] = useState("");
+  const [horas, setHoras] = useState(1);
+
+  const montoTutor = tutor.tarifaHora * horas;
+  const serviceFee = Math.round(montoTutor * SERVICE_FEE_RATE);
+  const total = montoTutor + serviceFee;
+
+  const handleConfirm = () => {
+    onConfirm({ tutor, fechaHora, horas });
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.4)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: "1rem",
+          padding: "1.5rem",
+          width: "100%",
+          maxWidth: "500px",
+        }}
+      >
+        <h3 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: "0.25rem" }}>
+          Reservar con {tutor.nombre} {tutor.apellido}
+        </h3>
+        <p style={{ fontSize: "0.85rem", color: "#4b5563", marginBottom: "0.75rem" }}>
+          Alumno: {alumno.nombre} {alumno.apellido}
+        </p>
+
+        <div style={{ display: "grid", gap: "0.75rem" }}>
+          <div>
+            <label style={{ fontSize: "0.85rem", color: "#4b5563" }}>
+              Fecha y hora
+            </label>
+            <input
+              type="datetime-local"
+              value={fechaHora}
+              onChange={(e) => setFechaHora(e.target.value)}
+              style={{ ...inputStyle, marginTop: "0.25rem" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: "0.85rem", color: "#4b5563" }}>
+              Horas
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+              <button
+                onClick={() => setHoras((h) => Math.max(1, h - 1))}
+                style={smallButton}
+              >
+                -
+              </button>
+              <div
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: "999px",
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  fontSize: "0.9rem",
+                }}
+              >
+                {horas}
+              </div>
+              <button
+                onClick={() => setHoras((h) => Math.min(8, h + 1))}
+                style={smallButton}
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginTop: "0.5rem", fontSize: "0.9rem", color: "#111827" }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span>Tarifa tutor</span>
+              <span>${montoTutor} MXN</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span>Tarifa EDUKT (8%)</span>
+              <span>${serviceFee} MXN</span>
+            </div>
+            <div
+              style={{
+                marginTop: "0.25rem",
+                paddingTop: "0.25rem",
+                borderTop: "1px solid #e5e7eb",
+                display: "flex",
+                justifyContent: "space-between",
+                fontWeight: 600,
+              }}
+            >
+              <span>Total</span>
+              <span>${total} MXN</span>
+            </div>
+          </div>
+
+          <p style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+            Después del pago, se crea (simulado) una invitación de Google Calendar
+            con el link de Zoom para ti y tu tutora.
+          </p>
+
+          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+            <button
+              onClick={handleConfirm}
+              style={{
+                flex: 1,
+                padding: "10px 16px",
+                borderRadius: "999px",
+                border: "none",
+                background: "#2563eb",
+                color: "white",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Pagar con Stripe (simulado)
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                padding: "10px 16px",
+                borderRadius: "999px",
+                border: "1px solid #d1d5db",
+                background: "white",
+                fontSize: "0.9rem",
+                cursor: "pointer",
+              }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalReview({ sesionInfo, tutores, onClose, onSave }) {
+  const { tutorId, sesionId } = sesionInfo;
+  const tutor = tutores.find((t) => t.id === tutorId);
+  if (!tutor) return null;
+  const sesion = tutor.sesiones.find((s) => s.id === sesionId);
+  if (!sesion) return null;
+
+  const [rating, setRating] = useState(5);
+  const [comentario, setComentario] = useState("");
+
+  const handleGuardar = () => {
+    if (!comentario) {
+      alert("Escribe un comentario sobre tu clase.");
+      return;
+    }
+    onSave({ tutorId, sesionId, rating, comentario });
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.4)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 40,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          borderRadius: "1rem",
+          padding: "1.5rem",
+          width: "100%",
+          maxWidth: "460px",
+        }}
+      >
+        <h3 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: "0.25rem" }}>
+          Califica tu clase
+        </h3>
+        <p style={{ fontSize: "0.85rem", color: "#4b5563", marginBottom: "0.75rem" }}>
+          Clase con {tutor.nombre} {tutor.apellido} el{" "}
+          {new Date(sesion.fechaHora).toLocaleString("es-MX")} ({sesion.horas} h)
+        </p>
+
+        <label style={{ fontSize: "0.85rem", color: "#4b5563" }}>
+          Calificación (0 a 5 estrellas)
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="5"
+          step="1"
+          value={rating}
+          onChange={(e) => setRating(Number(e.target.value))}
+          style={{ width: "100%", marginTop: "0.25rem" }}
+        />
+        <div style={{ fontSize: "0.9rem", marginBottom: "0.75rem" }}>
+          ⭐ {rating} / 5
+        </div>
+
+        <label style={{ fontSize: "0.85rem", color: "#4b5563" }}>
+          Comentario sobre la clase
+        </label>
+        <textarea
+          value={comentario}
+          onChange={(e) => setComentario(e.target.value)}
+          placeholder="¿Qué te pareció la clase? Esto ayudará a otros alumnos a elegir a su tutora."
+          style={{
+            ...inputStyle,
+            marginTop: "0.25rem",
+            minHeight: "80px",
+            resize: "vertical",
+          }}
+        />
+
+        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.75rem" }}>
+          <button
+            onClick={handleGuardar}
+            style={{
+              flex: 1,
+              padding: "10px 16px",
+              borderRadius: "999px",
+              border: "none",
+              background: "#059669",
+              color: "white",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Enviar calificación
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 16px",
+              borderRadius: "999px",
+              border: "1px solid #d1d5db",
+              background: "white",
+              fontSize: "0.9rem",
+              cursor: "pointer",
+            }}
+          >
+            Omitir
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PanelTutor({ tutores, onBack, onToggleDisponibilidad }) {
+  // Demo: eliges el primer tutor como si hubiera iniciado sesión
+  const tutor = tutores[0];
+
+  return (
+    <div style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem 1.5rem" }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: "none",
+          border: "none",
+          color: "#6b7280",
+          fontSize: "0.875rem",
+          cursor: "pointer",
+          marginBottom: "0.75rem",
+        }}
+      >
+        ← Volver
+      </button>
+      <h2 style={{ fontSize: "1.75rem", fontWeight: 700, marginBottom: "0.25rem" }}>
+        Panel de {tutor.nombre} {tutor.apellido}
+      </h2>
+      <p style={{ fontSize: "0.9rem", color: "#4b5563", marginBottom: "0.75rem" }}>
+        Aquí ves tus clases agendadas y puedes cambiar tu estado de disponible /
+        no disponible.
+      </p>
+
+      <div
+        style={{
+          display: "flex",
+          gap: "1rem",
+          alignItems: "center",
+          marginBottom: "1rem",
+        }}
+      >
+        <span
+          style={{
+            padding: "4px 10px",
+            borderRadius: "999px",
+            fontSize: "0.8rem",
+            fontWeight: 600,
+            background: tutor.isDisponible ? "#d1fae5" : "#e5e7eb",
+            color: tutor.isDisponible ? "#047857" : "#4b5563",
+          }}
+        >
+          Estado: {tutor.isDisponible ? "Disponible" : "No disponible"}
+        </span>
+        <button
+          onClick={() => onToggleDisponibilidad(tutor.id)}
+          style={{
+            padding: "6px 12px",
+            borderRadius: "999px",
+            border: "1px solid #d1d5db",
+            background: "white",
+            fontSize: "0.9rem",
+            cursor: "pointer",
+          }}
+        >
+          Cambiar estado
+        </button>
+      </div>
+
+      <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+        Mis clases
+      </h3>
+      <div
+        style={{
+          background: "white",
+          borderRadius: "1rem",
+          border: "1px solid #e5e7eb",
+          padding: "1rem",
+        }}
+      >
+        {tutor.sesiones.length === 0 ? (
+          <p style={{ fontSize: "0.9rem", color: "#6b7280" }}>
+            Aún no tienes clases agendadas.
+          </p>
+        ) : (
+          tutor.sesiones.map((s) => (
+            <div
+              key={s.id}
+              style={{
+                fontSize: "0.9rem",
+                padding: "0.5rem 0",
+                borderBottom: "1px solid #e5e7eb",
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>
+                {new Date(s.fechaHora).toLocaleString("es-MX")} · {s.horas} h
+              </span>
+              <span style={{ fontWeight: 600 }}>{s.alumnoNombre}</span>
+            </div>
+          ))
+        )}
+      </div>
+
+      <h3 style={{ fontSize: "1.1rem", fontWeight: 600, marginTop: "1.25rem" }}>
+        Comentarios de alumnos
+      </h3>
+      <div
+        style={{
+          background: "white",
+          borderRadius: "1rem",
+          border: "1px solid #e5e7eb",
+          padding: "1rem",
+          marginTop: "0.25rem",
+        }}
+      >
+        {tutor.reviews.length === 0 ? (
+          <p style={{ fontSize: "0.9rem", color: "#6b7280" }}>
+            Aún no tienes comentarios.
+          </p>
+        ) : (
+          tutor.reviews.map((r, idx) => (
+            <div
+              key={idx}
+              style={{
+                fontSize: "0.9rem",
+                padding: "0.5rem 0",
+                borderBottom: "1px solid #e5e7eb",
+              }}
+            >
+              <div>
+                ⭐ {r.rating} · {r.alumno}
+              </div>
+              <div style={{ fontSize: "0.85rem", color: "#4b5563" }}>
+                “{r.comentario}”
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Estilos reutilizables ----------
+
+const inputStyle = {
+  width: "100%",
+  borderRadius: "0.75rem",
+  border: "1px solid #d1d5db",
+  padding: "8px 12px",
+  fontSize: "0.9rem",
+  outline: "none",
+};
+
+const smallButton = {
+  padding: "6px 10px",
+  borderRadius: "999px",
+  border: "1px solid #d1d5db",
+  background: "white",
+  cursor: "pointer",
+};
+
+export default App;
