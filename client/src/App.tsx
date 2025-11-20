@@ -8,12 +8,21 @@ import { useToast } from "@/hooks/use-toast";
 import NotFound from "@/pages/not-found";
 import Landing from "@/components/Landing";
 import TutorForm from "@/components/TutorForm";
+import AlumnoForm from "@/components/AlumnoForm";
 import StudentPortal from "@/components/StudentPortal";
 import AdminPanel from "@/components/AdminPanel";
 
 function Router() {
   const { toast } = useToast();
-  const [view, setView] = useState<'landing' | 'tutor' | 'alumno' | 'admin' | null>('landing');
+  const [view, setView] = useState<'landing' | 'tutor' | 'alumno-registro' | 'alumno' | 'admin' | null>('landing');
+  const [alumnoRegistrado, setAlumnoRegistrado] = useState<any>(null);
+
+  useEffect(() => {
+    const savedAlumno = localStorage.getItem('edukt_alumno');
+    if (savedAlumno) {
+      setAlumnoRegistrado(JSON.parse(savedAlumno));
+    }
+  }, []);
   
   const { data: approvedTutors = [], refetch: refetchApproved } = useQuery<any[]>({
     queryKey: ['/api/tutors/approved'],
@@ -99,8 +108,55 @@ function Router() {
     },
   });
 
+  const createAlumnoMutation = useMutation({
+    mutationFn: async (alumnoData: any) => {
+      const response = await fetch('/api/alumnos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(alumnoData),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create alumno');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAlumnoRegistrado(data);
+      localStorage.setItem('edukt_alumno', JSON.stringify(data));
+      toast({
+        title: "¡Registro exitoso!",
+        description: `Bienvenido/a ${data.nombre}. Ahora puedes explorar nuestros tutores.`,
+      });
+      setView('alumno');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const submitTutor = (tutor: any) => {
     createTutorMutation.mutate(tutor);
+  };
+
+  const submitAlumno = (alumno: any) => {
+    createAlumnoMutation.mutate(alumno);
+  };
+
+  const handleSelectRole = (role: string) => {
+    if (role === 'alumno') {
+      if (alumnoRegistrado) {
+        setView('alumno');
+      } else {
+        setView('alumno-registro');
+      }
+    } else {
+      setView(role as any);
+    }
   };
 
   const approveTutor = (idx: number) => {
@@ -133,13 +189,24 @@ function Router() {
   return (
     <Switch>
       <Route path="/">
-        {view === 'landing' && <Landing onSelectRole={setView} />}
+        {view === 'landing' && <Landing onSelectRole={handleSelectRole} />}
         {view === 'tutor' && <TutorForm onSubmit={submitTutor} onBack={() => setView('landing')} />}
+        {view === 'alumno-registro' && (
+          <AlumnoForm 
+            onSubmit={submitAlumno} 
+            onBack={() => setView('landing')} 
+          />
+        )}
         {view === 'alumno' && (
           <StudentPortal 
             tutors={approvedTutors} 
-            onBack={() => setView('landing')} 
+            onBack={() => {
+              setView('landing');
+              setAlumnoRegistrado(null);
+              localStorage.removeItem('edukt_alumno');
+            }} 
             onCheckout={startCheckout}
+            alumno={alumnoRegistrado}
           />
         )}
         {view === 'admin' && (
