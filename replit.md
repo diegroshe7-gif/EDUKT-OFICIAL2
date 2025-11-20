@@ -62,8 +62,10 @@ Preferred communication style: Simple, everyday language.
   - Stored in localStorage on client-side
 - `sesiones` table: Scheduled tutoring sessions
   - Links tutors to students with booking details
-  - Fields: tutorId, alumnoId, fecha, horas, zoomLink
-  - Created automatically after successful payment
+  - Fields: tutorId, alumnoId, fecha, horas, zoomLink, googleCalendarEventId, paymentIntentId, status
+  - paymentIntentId: NOT NULL, UNIQUE - used for idempotent session creation
+  - Created automatically after successful payment verification
+  - Status tracking (default: "pendiente")
 - `reviews` table: Student ratings and feedback for tutors
   - Fields: tutorId, alumnoId, calificacion (0-5), comentario
   - Allows students to rate completed sessions
@@ -88,8 +90,18 @@ Preferred communication style: Simple, everyday language.
   - POST `/api/reviews` - Create new review
   - GET `/api/reviews/tutor/:tutorId` - Get all reviews for a tutor
 - Payment endpoints:
-  - POST `/api/create-payment-intent` - Initialize payment flow (validates tutor & student, stores metadata)
-  - POST `/api/confirm-session` - Verify payment and create session (called after successful payment)
+  - POST `/api/create-payment-intent` - Initialize payment flow
+    - Validates alumno and tutor existence and status
+    - Creates Stripe payment intent with metadata (tutorId, alumnoId, hours)
+    - Generates HMAC-signed booking token binding payment to specific student/tutor
+    - Returns: clientSecret, bookingToken, amount breakdown
+  - POST `/api/confirm-session` - Verify payment and create session
+    - Requires: paymentIntentId, bookingToken, alumnoId, tutorId
+    - Validates booking token signature and expiration
+    - Retrieves payment from Stripe and verifies status = "succeeded"
+    - Cross-validates provided IDs against Stripe metadata
+    - Checks for existing session by paymentIntentId (idempotency)
+    - Creates session record with paymentIntentId for deduplication
 
 **Key Architectural Decisions**
 - Separation of concerns with distinct `/client`, `/server`, and `/shared` directories
@@ -154,11 +166,37 @@ Preferred communication style: Simple, everyday language.
 - ⏳ Post-class rating system (0-5 stars) with comments
 - ⏳ Display of ratings/reviews on tutor profiles
 
-**Security Limitations & Known Issues**
-- **No server-side authentication**: Student authentication uses localStorage only, no JWT or session management
-- **Payment session vulnerability**: /api/confirm-session cannot verify that the caller owns the paymentIntent without server-side auth. For production, implement authenticated sessions or signed tokens.
-- **Deduplication heuristic**: Session duplicate prevention uses timestamp (1-minute window) instead of persisting paymentIntentId
-- Current implementation is suitable for MVP/demo but requires authentication layer for production use
+**Security Implementation & Limitations**
+
+*Payment Security (November 2025)*
+- **Booking Token System**: HMAC-SHA256 signed tokens bind payment intents to specific student/tutor pairs
+  - Token format: `paymentIntentId:alumnoId:tutorId:timestamp:signature`
+  - 24-hour expiration window
+  - Server validates token signature and verifies IDs against Stripe metadata
+  - Prevents unauthorized session creation with leaked payment IDs
+- **Payment Verification Flow**:
+  1. `/api/create-payment-intent` validates student and tutor, creates Stripe payment, generates signed booking token
+  2. Client stores token and completes payment with Stripe
+  3. `/api/confirm-session` validates token, verifies payment with Stripe, cross-checks IDs against trusted Stripe metadata
+  4. Session created with `paymentIntentId` (NOT NULL, UNIQUE) for idempotent deduplication
+- **Security Measures**:
+  - ✅ HMAC-signed tokens prevent forgery
+  - ✅ Cross-validation against Stripe metadata prevents ID manipulation
+  - ✅ O(1) deduplication using unique `paymentIntentId` column
+  - ✅ Token expiration limits replay window
+  - ✅ Normalized error messages prevent information leakage
+  - ⚠️ **Limitation**: Without server-side student authentication (JWT/sessions), intercepted tokens can still be replayed within 24h window
+  - ⚠️ **Limitation**: No single-use token enforcement (tokens not marked as consumed server-side)
+
+*Authentication*
+- **No server-side authentication**: Student authentication uses localStorage only
+- Tutor/student identity validated at payment creation, not at session confirmation
+- Current implementation suitable for MVP/demo/educational purposes
+- **Production requirements**: Implement JWT or session-based authentication to fully prevent token replay attacks
+
+*Deduplication*
+- ✅ Sessions keyed by unique `paymentIntentId` to prevent double-charging
+- Database constraint prevents duplicate sessions for same payment
 
 **Missing/Optional Integrations**
 - No email notification service for tutor approval/rejection or booking confirmations
