@@ -17,6 +17,7 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     nombre: "",
     edad: "",
     email: "",
+    password: "",
     telefono: "",
     materias: "",
     modalidad: "online",
@@ -95,17 +96,31 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="email">Correo Electrónico *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={formData.email}
+                  onChange={(e) => handleChange("email", e.target.value)}
+                  required
+                  data-testid="input-email"
+                />
+              </div>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Correo Electrónico *</Label>
+                  <Label htmlFor="password">Contraseña *</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="correo@ejemplo.com"
-                    value={formData.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
+                    id="password"
+                    type="password"
+                    placeholder="Mínimo 8 caracteres"
+                    value={formData.password}
+                    onChange={(e) => handleChange("password", e.target.value)}
                     required
-                    data-testid="input-email"
+                    minLength={8}
+                    data-testid="input-password"
                   />
                 </div>
                 <div className="space-y-2">
