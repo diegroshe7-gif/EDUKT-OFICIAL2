@@ -16,6 +16,7 @@ export default function AlumnoForm({ onSubmit, onBack }: AlumnoFormProps) {
     apellido: "",
     edad: "",
     email: "",
+    password: "",
   });
 
   const handleChange = (field: string, value: string) => {
@@ -84,6 +85,19 @@ export default function AlumnoForm({ onSubmit, onBack }: AlumnoFormProps) {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="email">Correo Electrónico *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={formData.email}
+                  onChange={(e) => handleChange("email", e.target.value)}
+                  required
+                  data-testid="input-alumno-email"
+                />
+              </div>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edad">Edad *</Label>
@@ -98,15 +112,16 @@ export default function AlumnoForm({ onSubmit, onBack }: AlumnoFormProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Correo Electrónico *</Label>
+                  <Label htmlFor="password">Contraseña *</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="correo@ejemplo.com"
-                    value={formData.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
+                    id="password"
+                    type="password"
+                    placeholder="Mínimo 8 caracteres"
+                    value={formData.password}
+                    onChange={(e) => handleChange("password", e.target.value)}
                     required
-                    data-testid="input-alumno-email"
+                    minLength={8}
+                    data-testid="input-alumno-password"
                   />
                 </div>
               </div>
