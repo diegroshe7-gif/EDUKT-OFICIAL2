@@ -57,19 +57,21 @@ export interface CalendarEventDetails {
   studentEmail: string;
   startTime: Date;
   durationHours: number;
-  zoomLink?: string;
 }
 
-export async function createTutoringSession(details: CalendarEventDetails): Promise<string> {
+export interface CalendarEventResult {
+  eventId: string;
+  meetLink: string;
+}
+
+export async function createTutoringSession(details: CalendarEventDetails): Promise<CalendarEventResult> {
   const calendar = await getUncachableGoogleCalendarClient();
   
   const endTime = new Date(details.startTime.getTime() + details.durationHours * 60 * 60 * 1000);
   
   const event = {
     summary: `Tutoría con ${details.tutorName}`,
-    description: details.zoomLink 
-      ? `Sesión de tutoría con ${details.tutorName}\n\nLink de Zoom: ${details.zoomLink}`
-      : `Sesión de tutoría con ${details.tutorName}`,
+    description: `Sesión de tutoría con ${details.tutorName}\n\nEstudiante: ${details.studentName}`,
     start: {
       dateTime: details.startTime.toISOString(),
       timeZone: 'America/Mexico_City',
@@ -82,7 +84,7 @@ export async function createTutoringSession(details: CalendarEventDetails): Prom
       { email: details.tutorEmail },
       { email: details.studentEmail },
     ],
-    conferenceData: details.zoomLink ? undefined : {
+    conferenceData: {
       createRequest: {
         requestId: `edukt-${Date.now()}`,
         conferenceSolutionKey: { type: 'hangoutsMeet' },
@@ -100,11 +102,16 @@ export async function createTutoringSession(details: CalendarEventDetails): Prom
   const response = await calendar.events.insert({
     calendarId: 'primary',
     requestBody: event,
-    conferenceDataVersion: details.zoomLink ? 0 : 1,
+    conferenceDataVersion: 1,
     sendUpdates: 'all',
   });
 
-  return response.data.id || '';
+  const meetLink = response.data.hangoutLink || response.data.conferenceData?.entryPoints?.[0]?.uri || '';
+
+  return {
+    eventId: response.data.id || '',
+    meetLink,
+  };
 }
 
 export async function deleteCalendarEvent(eventId: string): Promise<void> {

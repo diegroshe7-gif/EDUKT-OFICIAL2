@@ -5,6 +5,7 @@ import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReview
 import { z } from "zod";
 import Stripe from "stripe";
 import crypto from "crypto";
+import { createTutoringSession } from "./google-calendar";
 
 const stripe = process.env.STRIPE_SECRET_KEY 
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-10-29.clover" })
@@ -102,6 +103,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching rejected tutors:", error);
       res.status(500).json({ error: "Failed to fetch tutors" });
+    }
+  });
+
+  app.get("/api/tutors/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const tutor = await storage.getTutorById(id);
+      if (!tutor) {
+        return res.status(404).json({ error: "Tutor not found" });
+      }
+      res.json(tutor);
+    } catch (error) {
+      console.error("Error fetching tutor:", error);
+      res.status(500).json({ error: "Failed to fetch tutor" });
     }
   });
 
@@ -266,13 +281,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Booking cannot be completed" });
       }
 
+      // Schedule session for 7 days from now (placeholder - can be customized)
+      const sessionDate = new Date();
+      sessionDate.setDate(sessionDate.getDate() + 7);
+      sessionDate.setHours(10, 0, 0, 0); // 10 AM by default
+
+      // Create Google Calendar event with Google Meet link
+      let meetLink = '';
+      let googleCalendarEventId = '';
+      
+      try {
+        const calendarResult = await createTutoringSession({
+          tutorName: tutor.nombre,
+          tutorEmail: tutor.email,
+          studentName: `${alumno.nombre} ${alumno.apellido}`,
+          studentEmail: alumno.email,
+          startTime: sessionDate,
+          durationHours: parseInt(hours),
+        });
+        
+        meetLink = calendarResult.meetLink;
+        googleCalendarEventId = calendarResult.eventId;
+      } catch (calError) {
+        console.error("Error creating calendar event:", calError);
+        // Continue session creation even if calendar fails
+      }
+
       // Create session with verified data
       const sesion = await storage.createSesion({
         tutorId,
         alumnoId,
-        fecha: new Date().toISOString(),
+        fecha: sessionDate,
         horas: parseInt(hours),
-        zoomLink: null,
+        meetLink,
+        googleCalendarEventId,
         paymentIntentId,
       });
 

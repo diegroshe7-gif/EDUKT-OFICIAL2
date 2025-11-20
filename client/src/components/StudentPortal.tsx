@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import Checkout from "@/pages/checkout";
+import StudentSessions from "@/pages/student-sessions";
 
 interface StudentPortalProps {
   tutors: any[];
@@ -63,6 +64,12 @@ export default function StudentPortal({ tutors, onBack, onCheckout, alumno }: St
   const fee = Math.round(subtotal * SERVICE_FEE_RATE);
   const total = subtotal + fee;
 
+  const [showMySessions, setShowMySessions] = useState(false);
+
+  if (showMySessions && alumno) {
+    return <StudentSessions alumnoId={alumno.id} onBack={() => setShowMySessions(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
@@ -80,12 +87,24 @@ export default function StudentPortal({ tutors, onBack, onCheckout, alumno }: St
             <h1 className="text-2xl font-bold" style={{ fontFamily: 'Sora, sans-serif' }}>
               Encuentra tu Tutor
             </h1>
-            {alumno && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-alumno-nombre">
-                <User className="h-4 w-4" />
-                <span>{alumno.nombre} {alumno.apellido}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              {alumno && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowMySessions(true)}
+                    data-testid="button-my-sessions"
+                  >
+                    Mis Sesiones
+                  </Button>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="text-alumno-nombre">
+                    <User className="h-4 w-4" />
+                    <span>{alumno.nombre} {alumno.apellido}</span>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-3">

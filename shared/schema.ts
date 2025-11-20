@@ -75,7 +75,7 @@ export const sesiones = pgTable("sesiones", {
   alumnoId: varchar("alumno_id").notNull().references(() => alumnos.id),
   fecha: timestamp("fecha").notNull(),
   horas: integer("horas").notNull(),
-  zoomLink: text("zoom_link"),
+  meetLink: text("meet_link"),
   googleCalendarEventId: text("google_calendar_event_id"),
   paymentIntentId: text("payment_intent_id").notNull().unique(),
   status: text("status").notNull().default("pendiente"),
