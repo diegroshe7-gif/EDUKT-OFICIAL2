@@ -2,7 +2,9 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MapPin, Video, Users, Clock, DollarSign } from "lucide-react";
+import { MapPin, Video, Users, Clock, DollarSign, Star } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { Review } from "@shared/schema";
 
 interface TutorCardProps {
   tutor: {
@@ -27,6 +29,16 @@ export default function TutorCard({ tutor, onSchedule, onViewProfile }: TutorCar
   const materias = tutor.materias.split(',').map(m => m.trim());
   const initials = tutor.nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
+  const { data: reviews } = useQuery<Review[]>({
+    queryKey: ["/api/reviews/tutor", tutor.id],
+    enabled: !!tutor.id,
+  });
+
+  const averageRating = reviews && reviews.length > 0
+    ? reviews.reduce((sum, r) => sum + r.calificacion, 0) / reviews.length
+    : 0;
+  const reviewCount = reviews?.length || 0;
+
   return (
     <Card className="overflow-hidden hover-elevate" data-testid={`card-tutor-${tutor.id}`}>
       <CardHeader className="pb-4">
@@ -42,6 +54,13 @@ export default function TutorCard({ tutor, onSchedule, onViewProfile }: TutorCar
               {tutor.nombre}
             </h3>
             <p className="text-sm text-muted-foreground">{tutor.edad} años</p>
+            {reviewCount > 0 && (
+              <div className="flex items-center gap-1 mt-1" data-testid={`rating-${tutor.id}`}>
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <span className="text-sm font-medium">{averageRating.toFixed(1)}</span>
+                <span className="text-sm text-muted-foreground">({reviewCount})</span>
+              </div>
+            )}
           </div>
         </div>
       </CardHeader>
