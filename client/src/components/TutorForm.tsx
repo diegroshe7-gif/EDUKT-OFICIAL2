@@ -23,10 +23,10 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     ubicacion: "",
     tarifa: "",
     disponibilidad: "",
-    cvUrl: "",
+    cv_url: "",
     bio: "",
-    stripeAccountId: "",
-    calLink: "",
+    stripe_account_id: "",
+    cal_link: "",
   });
 
   const handleChange = (field: string, value: string) => {
@@ -234,25 +234,25 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cvUrl">Enlace a CV (Google Drive, Dropbox, etc.)</Label>
+                <Label htmlFor="cv_url">Enlace a CV (Google Drive, Dropbox, etc.)</Label>
                 <Input
-                  id="cvUrl"
+                  id="cv_url"
                   type="url"
                   placeholder="https://drive.google.com/..."
-                  value={formData.cvUrl}
-                  onChange={(e) => handleChange("cvUrl", e.target.value)}
+                  value={formData.cv_url}
+                  onChange={(e) => handleChange("cv_url", e.target.value)}
                   data-testid="input-cv-url"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="calLink">Enlace de Cal.com (opcional)</Label>
+                <Label htmlFor="cal_link">Enlace de Cal.com (opcional)</Label>
                 <Input
-                  id="calLink"
+                  id="cal_link"
                   type="url"
                   placeholder="https://cal.com/usuario/tutoria-60min"
-                  value={formData.calLink}
-                  onChange={(e) => handleChange("calLink", e.target.value)}
+                  value={formData.cal_link}
+                  onChange={(e) => handleChange("cal_link", e.target.value)}
                   data-testid="input-cal-link"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -261,12 +261,12 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="stripeAccountId">Stripe Connect Account ID (opcional)</Label>
+                <Label htmlFor="stripe_account_id">Stripe Connect Account ID (opcional)</Label>
                 <Input
-                  id="stripeAccountId"
+                  id="stripe_account_id"
                   placeholder="acct_..."
-                  value={formData.stripeAccountId}
-                  onChange={(e) => handleChange("stripeAccountId", e.target.value)}
+                  value={formData.stripe_account_id}
+                  onChange={(e) => handleChange("stripe_account_id", e.target.value)}
                   data-testid="input-stripe-id"
                 />
                 <p className="text-xs text-muted-foreground">

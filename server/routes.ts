@@ -5,19 +5,22 @@ import { insertTutorSchema } from "@shared/schema";
 import { z } from "zod";
 import Stripe from "stripe";
 
-const stripe = process.env.STRIPE_SECRET_KEY 
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-10-29.clover" })
+const stripeKey = process.env.TESTING_STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+const stripe = stripeKey
+  ? new Stripe(stripeKey, { apiVersion: "2025-10-29.clover" })
   : null;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Tutor routes
   app.post("/api/tutors", async (req, res) => {
     try {
+      console.log("POST /api/tutors - Request body:", JSON.stringify(req.body, null, 2));
       const validatedData = insertTutorSchema.parse(req.body);
       const tutor = await storage.createTutor(validatedData);
       res.json(tutor);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Validation error:", JSON.stringify(error.errors, null, 2));
         res.status(400).json({ error: "Invalid tutor data", details: error.errors });
       } else {
         console.error("Error creating tutor:", error);
