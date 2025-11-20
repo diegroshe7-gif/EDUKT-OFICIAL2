@@ -53,13 +53,14 @@ Preferred communication style: Simple, everyday language.
 
 **Database Schema**
 - `tutors` table: Stores tutor profiles with status workflow (pendiente → aprobado/rechazado)
-  - Core fields: nombre, edad, email, telefono, materias, modalidad, ubicacion, tarifa, disponibilidad
+  - Core fields: nombre, edad, email, password (bcrypt hashed), telefono, materias, modalidad, ubicacion, tarifa, disponibilidad
   - Integration fields: stripeAccountId, calLink, cvUrl, bio, universidad, fotoPerfil
   - Status tracking with createdAt timestamps
+  - Tutors must be approved before accessing portal
 - `alumnos` table: Student registration system
-  - Fields: nombre, apellido, edad, email
-  - Required before accessing tutor listings
-  - Stored in localStorage on client-side
+  - Fields: nombre, apellido, edad, email, password (bcrypt hashed)
+  - Students can access portal immediately after registration
+  - Session data stored in localStorage on client-side
 - `sesiones` table: Scheduled tutoring sessions
   - Links tutors to students with booking details
   - Fields: tutorId, alumnoId, fecha, horas, zoomLink, googleCalendarEventId, paymentIntentId, status
@@ -73,15 +74,19 @@ Preferred communication style: Simple, everyday language.
 
 **API Structure**
 - Tutor endpoints:
-  - POST `/api/tutors` - Create new tutor application
+  - POST `/api/tutors` - Create new tutor application (hashes password, returns without password field)
+  - POST `/api/tutors/login` - Tutor login with email and password (verifies bcrypt hash)
   - GET `/api/tutors/approved` - Retrieve all approved tutors for student browsing
   - GET `/api/tutors/pending` - Admin endpoint to view pending applications
   - GET `/api/tutors/rejected` - Admin endpoint to view rejected applications
   - PATCH `/api/tutors/:id/approve` - Admin endpoint to approve tutor
   - PATCH `/api/tutors/:id/reject` - Admin endpoint to reject tutor
 - Alumno (student) endpoints:
-  - POST `/api/alumnos` - Register new student
-  - GET `/api/alumnos/:id` - Retrieve student by ID
+  - POST `/api/alumnos` - Register new student (hashes password, returns without password field)
+  - POST `/api/alumnos/login` - Student login with email and password (verifies bcrypt hash)
+  - GET `/api/alumnos/:id` - Retrieve student by ID (password excluded from response)
+- Admin endpoints:
+  - POST `/api/admin/login` - Admin login with username "diegovictor778" and password from ADMINISTRADOR_KEY secret
 - Session endpoints:
   - POST `/api/sesiones` - Create new session (internal use)
   - GET `/api/sesiones/tutor/:tutorId` - Get all sessions for a tutor
@@ -153,9 +158,12 @@ Preferred communication style: Simple, everyday language.
 - vaul for drawer components
 
 **Current Features & Implementation Status**
-- ✅ Three-role system (Student, Tutor, Admin) with localStorage-based role persistence
-- ✅ Tutor approval workflow (pending → approved/rejected)
-- ✅ Student mandatory registration before accessing tutor listings
+- ✅ Three-role system (Student, Tutor, Admin) with password-based authentication
+- ✅ Secure password authentication using bcrypt (12 rounds) for all roles
+- ✅ Login endpoints for students, tutors, and admin with credential verification
+- ✅ Tutor approval workflow (pending → approved/rejected) - tutors must be approved before portal access
+- ✅ Student registration and login with immediate portal access
+- ✅ Admin login using username "diegovictor778" with password from ADMINISTRADOR_KEY secret
 - ✅ Tutor search and filtering by name, subject, and modality
 - ✅ Stripe payment processing with 8% service fee
 - ✅ Automatic session creation after successful payment
