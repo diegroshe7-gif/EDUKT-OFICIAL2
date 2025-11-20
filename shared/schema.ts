@@ -77,6 +77,7 @@ export const sesiones = pgTable("sesiones", {
   horas: integer("horas").notNull(),
   zoomLink: text("zoom_link"),
   googleCalendarEventId: text("google_calendar_event_id"),
+  paymentIntentId: text("payment_intent_id").notNull().unique(),
   status: text("status").notNull().default("pendiente"),
   createdAt: timestamp("created_at").defaultNow(),
 });

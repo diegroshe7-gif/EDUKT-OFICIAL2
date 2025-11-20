@@ -4,10 +4,57 @@ import { storage } from "./storage";
 import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReviewSchema } from "@shared/schema";
 import { z } from "zod";
 import Stripe from "stripe";
+import crypto from "crypto";
 
 const stripe = process.env.STRIPE_SECRET_KEY 
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-10-29.clover" })
   : null;
+
+// Generate HMAC token for booking verification
+const BOOKING_TOKEN_SECRET = process.env.SESSION_SECRET || "edukt-booking-secret-key";
+
+function generateBookingToken(paymentIntentId: string, alumnoId: string, tutorId: string): string {
+  const timestamp = Date.now();
+  const data = `${paymentIntentId}:${alumnoId}:${tutorId}:${timestamp}`;
+  const signature = crypto.createHmac('sha256', BOOKING_TOKEN_SECRET)
+    .update(data)
+    .digest('hex');
+  return `${data}:${signature}`;
+}
+
+function verifyBookingToken(token: string, paymentIntentId: string, alumnoId: string, tutorId: string): boolean {
+  try {
+    const parts = token.split(':');
+    if (parts.length !== 5) {
+      return false;
+    }
+    
+    const [storedIntentId, storedAlumnoId, storedTutorId, timestamp, signature] = parts;
+    
+    // Verify all IDs match
+    if (storedIntentId !== paymentIntentId || 
+        storedAlumnoId !== alumnoId || 
+        storedTutorId !== tutorId) {
+      return false;
+    }
+    
+    // Verify token is not too old (24 hours)
+    const tokenAge = Date.now() - parseInt(timestamp);
+    if (tokenAge > 24 * 60 * 60 * 1000) {
+      return false;
+    }
+    
+    // Verify signature
+    const data = `${storedIntentId}:${storedAlumnoId}:${storedTutorId}:${timestamp}`;
+    const expectedSignature = crypto.createHmac('sha256', BOOKING_TOKEN_SECRET)
+      .update(data)
+      .digest('hex');
+    
+    return signature === expectedSignature;
+  } catch (error) {
+    return false;
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Tutor routes
@@ -95,10 +142,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { tutorId, hours } = req.body;
+      const { tutorId, alumnoId, hours } = req.body;
       
-      if (!tutorId || !hours || hours < 1) {
+      if (!tutorId || !alumnoId || !hours || hours < 1) {
         return res.status(400).json({ error: "Missing or invalid required fields" });
+      }
+
+      // Validate alumno exists
+      const alumno = await storage.getAlumnoById(alumnoId);
+      if (!alumno) {
+        return res.status(404).json({ error: "Alumno not found" });
       }
 
       // Look up tutor server-side to get authoritative pricing
@@ -122,6 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currency: "mxn",
         metadata: {
           tutorId: tutor.id,
+          alumnoId: alumno.id,
           tutorName: tutor.nombre,
           hours: hours.toString(),
           subtotal: subtotal.toString(),
@@ -130,8 +184,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: `Clase de tutoría con ${tutor.nombre} - ${hours}h`,
       });
 
+      // Generate secure booking token to bind this payment to specific alumno and tutor
+      const bookingToken = generateBookingToken(paymentIntent.id, alumno.id, tutor.id);
+
       res.json({ 
         clientSecret: paymentIntent.client_secret,
+        bookingToken,
         amount: total,
         subtotal,
         serviceFee,
@@ -140,6 +198,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error creating payment intent:", error);
       res.status(500).json({ 
         error: "Error creating payment intent: " + error.message 
+      });
+    }
+  });
+
+  // Confirm session after successful payment
+  app.post("/api/confirm-session", async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(503).json({ 
+          error: "Stripe not configured." 
+        });
+      }
+
+      const { paymentIntentId, bookingToken, alumnoId, tutorId } = req.body;
+      
+      if (!paymentIntentId || !bookingToken || !alumnoId || !tutorId) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Retrieve and verify payment intent from Stripe first
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      if (paymentIntent.status !== "succeeded") {
+        return res.status(400).json({ error: "Payment not successful" });
+      }
+
+      // Extract session data from trusted metadata
+      const metadataTutorId = paymentIntent.metadata.tutorId;
+      const metadataAlumnoId = paymentIntent.metadata.alumnoId;
+      const hours = paymentIntent.metadata.hours;
+      
+      if (!metadataTutorId || !metadataAlumnoId || !hours) {
+        return res.status(400).json({ error: "Invalid payment metadata" });
+      }
+
+      // Verify that provided IDs match metadata from Stripe (trusted source)
+      if (tutorId !== metadataTutorId || alumnoId !== metadataAlumnoId) {
+        return res.status(403).json({ error: "Invalid request" });
+      }
+
+      // Verify booking token binds to this specific payment/alumno/tutor
+      if (!verifyBookingToken(bookingToken, paymentIntentId, alumnoId, tutorId)) {
+        return res.status(403).json({ error: "Invalid or expired booking token" });
+      }
+
+      // Check if session already exists for this paymentIntentId (idempotency)
+      const existingSession = await storage.getSesionByPaymentIntentId(paymentIntentId);
+      
+      if (existingSession) {
+        return res.json(existingSession); // Return existing session, prevent duplicates
+      }
+
+      // Revalidate alumno still exists
+      const alumno = await storage.getAlumnoById(alumnoId);
+      if (!alumno) {
+        return res.status(404).json({ error: "Student information not found" });
+      }
+
+      // Revalidate tutor still exists and is approved
+      const tutor = await storage.getTutorById(tutorId);
+      if (!tutor) {
+        return res.status(404).json({ error: "Tutor information not found" });
+      }
+
+      if (tutor.status !== "aprobado") {
+        return res.status(403).json({ error: "Booking cannot be completed" });
+      }
+
+      // Create session with verified data
+      const sesion = await storage.createSesion({
+        tutorId,
+        alumnoId,
+        fecha: new Date().toISOString(),
+        horas: parseInt(hours),
+        zoomLink: null,
+        paymentIntentId,
+      });
+
+      res.json(sesion);
+    } catch (error: any) {
+      console.error("Error confirming session:", error);
+      res.status(500).json({ 
+        error: "Error creating session: " + error.message 
       });
     }
   });
