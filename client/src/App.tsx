@@ -9,14 +9,18 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/components/Landing";
 import TutorForm from "@/components/TutorForm";
 import AlumnoForm from "@/components/AlumnoForm";
+import AlumnoLogin from "@/components/AlumnoLogin";
+import TutorLogin from "@/components/TutorLogin";
+import AdminLogin from "@/components/AdminLogin";
 import StudentPortal from "@/components/StudentPortal";
 import AdminPanel from "@/components/AdminPanel";
 import TutorPortal from "@/components/TutorPortal";
 
 function Router() {
   const { toast } = useToast();
-  const [view, setView] = useState<'landing' | 'tutor' | 'tutor-login' | 'alumno-registro' | 'alumno' | 'admin' | null>('landing');
+  const [view, setView] = useState<'landing' | 'tutor-registro' | 'tutor-login' | 'tutor-portal' | 'alumno-registro' | 'alumno-login' | 'alumno' | 'admin-login' | 'admin' | null>('landing');
   const [alumnoRegistrado, setAlumnoRegistrado] = useState<any>(null);
+  const [tutorActual, setTutorActual] = useState<any>(null);
 
   useEffect(() => {
     const savedAlumno = localStorage.getItem('edukt_alumno');
@@ -148,18 +152,38 @@ function Router() {
     createAlumnoMutation.mutate(alumno);
   };
 
-  const handleSelectRole = (role: string) => {
+  const handleSelectRole = (role: 'alumno' | 'tutor' | 'admin', action: 'register' | 'login') => {
     if (role === 'alumno') {
-      if (alumnoRegistrado) {
-        setView('alumno');
-      } else {
+      if (action === 'register') {
         setView('alumno-registro');
+      } else {
+        setView('alumno-login');
       }
     } else if (role === 'tutor') {
-      setView('tutor-login');
-    } else {
-      setView(role as any);
+      if (action === 'register') {
+        setView('tutor-registro');
+      } else {
+        setView('tutor-login');
+      }
+    } else if (role === 'admin') {
+      setView('admin-login');
     }
+  };
+
+  const handleAlumnoLoginSuccess = (alumno: any) => {
+    setAlumnoRegistrado(alumno);
+    localStorage.setItem('edukt_alumno', JSON.stringify(alumno));
+    setView('alumno');
+  };
+
+  const handleTutorLoginSuccess = (tutor: any) => {
+    setTutorActual(tutor);
+    localStorage.setItem('edukt_tutor', JSON.stringify(tutor));
+    setView('tutor-portal');
+  };
+
+  const handleAdminLoginSuccess = () => {
+    setView('admin');
   };
 
   const approveTutor = (idx: number) => {
@@ -193,14 +217,22 @@ function Router() {
     <Switch>
       <Route path="/">
         {view === 'landing' && <Landing onSelectRole={handleSelectRole} />}
-        {view === 'tutor' && <TutorForm onSubmit={submitTutor} onBack={() => setView('landing')} />}
-        {view === 'tutor-login' && <TutorPortal onBack={() => setView('landing')} />}
+        
+        {view === 'tutor-registro' && <TutorForm onSubmit={submitTutor} onBack={() => setView('landing')} />}
+        {view === 'tutor-login' && <TutorLogin onSuccess={handleTutorLoginSuccess} onBack={() => setView('landing')} />}
+        {view === 'tutor-portal' && <TutorPortal onBack={() => {
+          setView('landing');
+          setTutorActual(null);
+          localStorage.removeItem('edukt_tutor');
+        }} />}
+        
         {view === 'alumno-registro' && (
           <AlumnoForm 
             onSubmit={submitAlumno} 
             onBack={() => setView('landing')} 
           />
         )}
+        {view === 'alumno-login' && <AlumnoLogin onSuccess={handleAlumnoLoginSuccess} onBack={() => setView('landing')} />}
         {view === 'alumno' && (
           <StudentPortal 
             tutors={approvedTutors} 
@@ -213,6 +245,8 @@ function Router() {
             alumno={alumnoRegistrado}
           />
         )}
+        
+        {view === 'admin-login' && <AdminLogin onSuccess={handleAdminLoginSuccess} onBack={() => setView('landing')} />}
         {view === 'admin' && (
           <AdminPanel
             pending={pendingTutors}
