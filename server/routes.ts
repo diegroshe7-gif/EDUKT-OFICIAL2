@@ -6,6 +6,7 @@ import { z } from "zod";
 import Stripe from "stripe";
 import crypto from "crypto";
 import { createTutoringSession } from "./google-calendar";
+import { hashPassword, verifyPassword, verifyAdminCredentials } from "./auth";
 
 const stripe = process.env.STRIPE_SECRET_KEY 
   ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-10-29.clover" })
@@ -63,8 +64,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("POST /api/tutors - Request body:", JSON.stringify(req.body, null, 2));
       const validatedData = insertTutorSchema.parse(req.body);
-      const tutor = await storage.createTutor(validatedData);
-      res.json(tutor);
+      
+      // Hash password before storing
+      const hashedPassword = await hashPassword(validatedData.password);
+      const tutorData = { ...validatedData, password: hashedPassword };
+      
+      const tutor = await storage.createTutor(tutorData);
+      
+      // Never return password in response
+      const { password, ...tutorResponse } = tutor;
+      res.json(tutorResponse);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.error("Validation error:", JSON.stringify(error.errors, null, 2));
@@ -337,8 +346,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ error: "Email already registered" });
       }
       
-      const alumno = await storage.createAlumno(validatedData);
-      res.json(alumno);
+      // Hash password before storing
+      const hashedPassword = await hashPassword(validatedData.password);
+      const alumnoData = { ...validatedData, password: hashedPassword };
+      
+      const alumno = await storage.createAlumno(alumnoData);
+      
+      // Never return password in response
+      const { password, ...alumnoResponse } = alumno;
+      res.json(alumnoResponse);
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid alumno data", details: error.errors });
@@ -356,10 +372,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!alumno) {
         return res.status(404).json({ error: "Alumno not found" });
       }
-      res.json(alumno);
+      // Never return password
+      const { password, ...alumnoResponse } = alumno;
+      res.json(alumnoResponse);
     } catch (error) {
       console.error("Error fetching alumno:", error);
       res.status(500).json({ error: "Failed to fetch alumno" });
+    }
+  });
+
+  // Login endpoints
+  app.post("/api/alumnos/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email y contraseña son requeridos" });
+      }
+      
+      const alumno = await storage.getAlumnoByEmail(email);
+      if (!alumno) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      
+      const isValid = await verifyPassword(password, alumno.password);
+      if (!isValid) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      
+      // Never return password
+      const { password: _, ...alumnoResponse } = alumno;
+      res.json(alumnoResponse);
+    } catch (error) {
+      console.error("Error during alumno login:", error);
+      res.status(500).json({ error: "Error al iniciar sesión" });
+    }
+  });
+
+  app.post("/api/tutors/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email y contraseña son requeridos" });
+      }
+      
+      const tutor = await storage.getTutorByEmail(email);
+      if (!tutor) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      
+      const isValid = await verifyPassword(password, tutor.password);
+      if (!isValid) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      
+      // Never return password
+      const { password: _, ...tutorResponse } = tutor;
+      res.json(tutorResponse);
+    } catch (error) {
+      console.error("Error during tutor login:", error);
+      res.status(500).json({ error: "Error al iniciar sesión" });
+    }
+  });
+
+  app.post("/api/admin/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Usuario y contraseña son requeridos" });
+      }
+      
+      const isValid = verifyAdminCredentials(username, password);
+      if (!isValid) {
+        return res.status(401).json({ error: "Credenciales inválidas" });
+      }
+      
+      res.json({ 
+        username: "diegovictor778",
+        role: "admin"
+      });
+    } catch (error) {
+      console.error("Error during admin login:", error);
+      res.status(500).json({ error: "Error al iniciar sesión" });
     }
   });
 
