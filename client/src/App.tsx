@@ -117,7 +117,7 @@ function Router() {
     }
   };
 
-  const SERVICE_FEE_RATE = 0.15;
+  const SERVICE_FEE_RATE = 0.08;
   const startCheckout = async ({ tutor, hours = 1 }: { tutor: any; hours: number }) => {
     const subtotal = Number(tutor.tarifa) * hours;
     const fee = Math.round(subtotal * SERVICE_FEE_RATE);
