@@ -16,6 +16,8 @@ export const tutors = pgTable("tutors", {
   disponibilidad: text("disponibilidad").notNull(),
   cvUrl: text("cv_url"),
   bio: text("bio"),
+  universidad: text("universidad"),
+  fotoPerfil: text("foto_perfil"),
   stripeAccountId: text("stripe_account_id"),
   calLink: text("cal_link"),
   status: text("status").notNull().default("pendiente"),
@@ -47,3 +49,65 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+export const alumnos = pgTable("alumnos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nombre: text("nombre").notNull(),
+  apellido: text("apellido").notNull(),
+  edad: integer("edad").notNull(),
+  email: text("email").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAlumnoSchema = createInsertSchema(alumnos, {
+  edad: z.coerce.number().int().positive(),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAlumno = z.infer<typeof insertAlumnoSchema>;
+export type Alumno = typeof alumnos.$inferSelect;
+
+export const sesiones = pgTable("sesiones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tutorId: varchar("tutor_id").notNull().references(() => tutors.id),
+  alumnoId: varchar("alumno_id").notNull().references(() => alumnos.id),
+  fecha: timestamp("fecha").notNull(),
+  horas: integer("horas").notNull(),
+  zoomLink: text("zoom_link"),
+  googleCalendarEventId: text("google_calendar_event_id"),
+  status: text("status").notNull().default("pendiente"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSesionSchema = createInsertSchema(sesiones, {
+  horas: z.coerce.number().int().positive(),
+}).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+});
+
+export type InsertSesion = z.infer<typeof insertSesionSchema>;
+export type Sesion = typeof sesiones.$inferSelect;
+
+export const reviews = pgTable("reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tutorId: varchar("tutor_id").notNull().references(() => tutors.id),
+  alumnoId: varchar("alumno_id").notNull().references(() => alumnos.id),
+  sesionId: varchar("sesion_id").references(() => sesiones.id),
+  calificacion: integer("calificacion").notNull(),
+  comentario: text("comentario"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertReviewSchema = createInsertSchema(reviews, {
+  calificacion: z.coerce.number().int().min(0).max(5),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertReview = z.infer<typeof insertReviewSchema>;
+export type Review = typeof reviews.$inferSelect;
