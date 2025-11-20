@@ -33,6 +33,8 @@ export interface IStorage {
   getSesionById(id: string): Promise<Sesion | undefined>;
   getSesionesByTutor(tutorId: string): Promise<Sesion[]>;
   getSesionesByAlumno(alumnoId: string): Promise<Sesion[]>;
+  getAllSesiones(): Promise<Sesion[]>;
+  getSesionByPaymentIntentId(paymentIntentId: string): Promise<Sesion | undefined>;
   updateSesionStatus(id: string, status: string): Promise<Sesion | undefined>;
   
   createReview(review: InsertReview): Promise<Review>;
@@ -119,6 +121,17 @@ export class DbStorage implements IStorage {
 
   async getSesionesByAlumno(alumnoId: string): Promise<Sesion[]> {
     return await db.select().from(sesiones).where(eq(sesiones.alumnoId, alumnoId));
+  }
+
+  async getAllSesiones(): Promise<Sesion[]> {
+    return await db.select().from(sesiones);
+  }
+
+  async getSesionByPaymentIntentId(paymentIntentId: string): Promise<Sesion | undefined> {
+    const result = await db.select().from(sesiones)
+      .where(eq(sesiones.paymentIntentId, paymentIntentId))
+      .limit(1);
+    return result[0];
   }
 
   async updateSesionStatus(id: string, status: string): Promise<Sesion | undefined> {

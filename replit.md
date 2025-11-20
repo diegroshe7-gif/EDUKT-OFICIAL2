@@ -54,19 +54,42 @@ Preferred communication style: Simple, everyday language.
 **Database Schema**
 - `tutors` table: Stores tutor profiles with status workflow (pendiente → aprobado/rechazado)
   - Core fields: nombre, edad, email, telefono, materias, modalidad, ubicacion, tarifa, disponibilidad
-  - Integration fields: stripeAccountId, calLink, cvUrl, bio
+  - Integration fields: stripeAccountId, calLink, cvUrl, bio, universidad, fotoPerfil
   - Status tracking with createdAt timestamps
-- `users` table: Simple authentication structure with username and password
+- `alumnos` table: Student registration system
+  - Fields: nombre, apellido, edad, email
+  - Required before accessing tutor listings
+  - Stored in localStorage on client-side
+- `sesiones` table: Scheduled tutoring sessions
+  - Links tutors to students with booking details
+  - Fields: tutorId, alumnoId, fecha, horas, zoomLink
+  - Created automatically after successful payment
+- `reviews` table: Student ratings and feedback for tutors
+  - Fields: tutorId, alumnoId, calificacion (0-5), comentario
+  - Allows students to rate completed sessions
+- `users` table: Simple authentication structure with username and password (currently unused)
 
 **API Structure**
-- POST `/api/tutors` - Create new tutor application
-- GET `/api/tutors/approved` - Retrieve all approved tutors for student browsing
-- GET `/api/tutors/pending` - Admin endpoint to view pending applications
-- GET `/api/tutors/rejected` - Admin endpoint to view rejected applications
-- PATCH `/api/tutors/:id/approve` - Admin endpoint to approve tutor
-- PATCH `/api/tutors/:id/reject` - Admin endpoint to reject tutor
-- POST `/api/stripe/webhook` - Stripe webhook handler for payment events
-- POST `/api/payments/create-payment-intent` - Initialize payment flow
+- Tutor endpoints:
+  - POST `/api/tutors` - Create new tutor application
+  - GET `/api/tutors/approved` - Retrieve all approved tutors for student browsing
+  - GET `/api/tutors/pending` - Admin endpoint to view pending applications
+  - GET `/api/tutors/rejected` - Admin endpoint to view rejected applications
+  - PATCH `/api/tutors/:id/approve` - Admin endpoint to approve tutor
+  - PATCH `/api/tutors/:id/reject` - Admin endpoint to reject tutor
+- Alumno (student) endpoints:
+  - POST `/api/alumnos` - Register new student
+  - GET `/api/alumnos/:id` - Retrieve student by ID
+- Session endpoints:
+  - POST `/api/sesiones` - Create new session (internal use)
+  - GET `/api/sesiones/tutor/:tutorId` - Get all sessions for a tutor
+  - GET `/api/sesiones/alumno/:alumnoId` - Get all sessions for a student
+- Review endpoints:
+  - POST `/api/reviews` - Create new review
+  - GET `/api/reviews/tutor/:tutorId` - Get all reviews for a tutor
+- Payment endpoints:
+  - POST `/api/create-payment-intent` - Initialize payment flow (validates tutor & student, stores metadata)
+  - POST `/api/confirm-session` - Verify payment and create session (called after successful payment)
 
 **Key Architectural Decisions**
 - Separation of concerns with distinct `/client`, `/server`, and `/shared` directories
@@ -117,8 +140,28 @@ Preferred communication style: Simple, everyday language.
 - cmdk for command palette functionality
 - vaul for drawer components
 
+**Current Features & Implementation Status**
+- ✅ Three-role system (Student, Tutor, Admin) with localStorage-based role persistence
+- ✅ Tutor approval workflow (pending → approved/rejected)
+- ✅ Student mandatory registration before accessing tutor listings
+- ✅ Tutor search and filtering by name, subject, and modality
+- ✅ Stripe payment processing with 8% service fee
+- ✅ Automatic session creation after successful payment
+- ✅ Enhanced tutor profiles with university and optional photo
+- 🔄 Google Calendar integration (connector available, not yet configured)
+- 🔄 Zoom integration for automated meeting links (no native connector available)
+- ⏳ Teacher calendar view showing scheduled sessions
+- ⏳ Post-class rating system (0-5 stars) with comments
+- ⏳ Display of ratings/reviews on tutor profiles
+
+**Security Limitations & Known Issues**
+- **No server-side authentication**: Student authentication uses localStorage only, no JWT or session management
+- **Payment session vulnerability**: /api/confirm-session cannot verify that the caller owns the paymentIntent without server-side auth. For production, implement authenticated sessions or signed tokens.
+- **Deduplication heuristic**: Session duplicate prevention uses timestamp (1-minute window) instead of persisting paymentIntentId
+- Current implementation is suitable for MVP/demo but requires authentication layer for production use
+
 **Missing/Optional Integrations**
-- No authentication system currently implemented (users table exists but unused)
-- No session storage or JWT implementation
-- No email notification service for tutor approval/rejection
+- No email notification service for tutor approval/rejection or booking confirmations
 - No real-time communication (could be added for tutor-student messaging)
+- No automated calendar invitations (Google Calendar connector available but not configured)
+- No automated Zoom meeting creation (requires manual API integration)

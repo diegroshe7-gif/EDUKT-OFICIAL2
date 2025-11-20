@@ -12,12 +12,16 @@ const stripePromise = import.meta.env.VITE_STRIPE_PUBLIC_KEY
   : null;
 
 interface CheckoutFormProps {
+  tutorId: string;
   tutorName: string;
+  alumnoId: string;
+  hours: number;
+  bookingToken: string;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-const CheckoutForm = ({ tutorName, onSuccess, onCancel }: CheckoutFormProps) => {
+const CheckoutForm = ({ tutorId, tutorName, alumnoId, hours, bookingToken, onSuccess, onCancel }: CheckoutFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
@@ -32,7 +36,7 @@ const CheckoutForm = ({ tutorName, onSuccess, onCancel }: CheckoutFormProps) => 
 
     setIsProcessing(true);
 
-    const { error } = await stripe.confirmPayment({
+    const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
         return_url: window.location.origin,
@@ -48,12 +52,28 @@ const CheckoutForm = ({ tutorName, onSuccess, onCancel }: CheckoutFormProps) => 
         description: error.message,
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "¡Pago exitoso!",
-        description: `Tu clase con ${tutorName} ha sido reservada.`,
-      });
-      onSuccess();
+    } else if (paymentIntent) {
+      try {
+        await apiRequest("POST", "/api/confirm-session", {
+          paymentIntentId: paymentIntent.id,
+          bookingToken,
+          alumnoId,
+          tutorId,
+        });
+
+        toast({
+          title: "¡Pago exitoso!",
+          description: `Tu clase con ${tutorName} ha sido reservada.`,
+        });
+        onSuccess();
+      } catch (err) {
+        console.error("Error creating session:", err);
+        toast({
+          title: "Pago procesado",
+          description: "El pago fue exitoso pero hubo un error al crear la sesión. Por favor contacta al administrador.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -101,6 +121,7 @@ interface CheckoutProps {
 
 export default function Checkout({ tutor, hours, alumno, onSuccess, onCancel }: CheckoutProps) {
   const [clientSecret, setClientSecret] = useState("");
+  const [bookingToken, setBookingToken] = useState("");
   const [amount, setAmount] = useState(0);
   const [error, setError] = useState("");
 
@@ -117,6 +138,7 @@ export default function Checkout({ tutor, hours, alumno, onSuccess, onCancel }: 
 
     apiRequest("POST", "/api/create-payment-intent", { 
       tutorId: tutor.id,
+      alumnoId: alumno.id,
       hours,
     })
       .then((res) => res.json())
@@ -125,6 +147,7 @@ export default function Checkout({ tutor, hours, alumno, onSuccess, onCancel }: 
           setError(data.error);
         } else {
           setClientSecret(data.clientSecret);
+          setBookingToken(data.bookingToken);
           setAmount(data.amount);
         }
       })
@@ -150,7 +173,7 @@ export default function Checkout({ tutor, hours, alumno, onSuccess, onCancel }: 
     );
   }
 
-  if (!clientSecret) {
+  if (!clientSecret || !bookingToken) {
     return (
       <Card>
         <CardContent className="py-16 flex flex-col items-center justify-center gap-4">
@@ -190,7 +213,11 @@ export default function Checkout({ tutor, hours, alumno, onSuccess, onCancel }: 
       <CardContent>
         <Elements stripe={stripePromise} options={{ clientSecret }}>
           <CheckoutForm 
+            tutorId={tutor.id}
             tutorName={tutor.nombre}
+            alumnoId={alumno.id}
+            hours={hours}
+            bookingToken={bookingToken}
             onSuccess={onSuccess}
             onCancel={onCancel}
           />
