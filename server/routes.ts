@@ -114,7 +114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate pricing server-side using trusted data
       const subtotal = Math.round(tutor.tarifa * hours);
-      const serviceFee = Math.round(subtotal * 0.15);
+      const serviceFee = Math.round(subtotal * 0.08);
       const total = subtotal + serviceFee;
 
       const paymentIntent = await stripe.paymentIntents.create({
