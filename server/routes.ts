@@ -132,10 +132,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tutors/:id/approve", async (req, res) => {
     try {
       const { id } = req.params;
-      const tutor = await storage.updateTutorStatus(id, "aprobado");
-      if (!tutor) {
+      
+      // Get tutor details first
+      const tutorToApprove = await storage.getTutorById(id);
+      if (!tutorToApprove) {
         return res.status(404).json({ error: "Tutor not found" });
       }
+
+      // Validate banking information is complete for payouts
+      if (!tutorToApprove.clabe || !tutorToApprove.banco || !tutorToApprove.rfc) {
+        return res.status(400).json({ 
+          error: "Información bancaria incompleta. El tutor debe proporcionar CLABE, banco y RFC para recibir pagos." 
+        });
+      }
+
+      // Validate CLABE format (18 digits)
+      if (!/^\d{18}$/.test(tutorToApprove.clabe)) {
+        return res.status(400).json({ 
+          error: "CLABE inválida. Debe tener exactamente 18 dígitos." 
+        });
+      }
+
+      // Validate RFC format (12 or 13 characters)
+      if (!/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(tutorToApprove.rfc)) {
+        return res.status(400).json({ 
+          error: "RFC inválido. Debe tener el formato correcto (12 o 13 caracteres)." 
+        });
+      }
+
+      // Approve the tutor - payouts will be handled via Stripe Transfers API
+      // when payments are processed, using the stored banking information
+      const tutor = await storage.updateTutorStatus(id, "aprobado");
+      
+      console.log(`Tutor ${id} approved with banking info: CLABE ending in ${tutorToApprove.clabe.slice(-4)}`);
+      
       res.json(tutor);
     } catch (error) {
       console.error("Error approving tutor:", error);

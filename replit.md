@@ -189,9 +189,21 @@ Preferred communication style: Simple, everyday language.
 - ✅ Teacher calendar view showing scheduled sessions
 - ✅ Post-class rating system (0-5 stars) with comments
 - ✅ Display of ratings/reviews on tutor profiles
+- ✅ **Financial reporting (November 2025):**
+  - AdminReports: complete revenue analytics, platform fees, transaction history
+  - TutorIncome: tutor earnings, session history, monthly breakdown with date filters
+  - All financial data persisted in sessions table (subtotal, platformFee, total)
+- ✅ **Banking information for tutors (November 2025):**
+  - Tutors provide CLABE (18 digits), bank name, and RFC during registration
+  - Server-side validation of CLABE and RFC formats
+  - Banking info required before tutor approval
+  - Information stored for future payout implementation
 - 🔄 Google Calendar integration (connector available, not yet configured)
 - 🔄 Zoom integration for automated meeting links (no native connector available)
-- ⏳ Complete booking flow integration (TutorProfile → Stripe Checkout → Session creation)
+- 🔄 **Stripe Connect automatic transfers (in progress):**
+  - Banking info collected and validated
+  - Full Stripe Connect onboarding pending (requires KYC verification, TOS acceptance)
+  - Current workaround: Manual transfers using collected banking data
 
 **Security Implementation & Limitations**
 
