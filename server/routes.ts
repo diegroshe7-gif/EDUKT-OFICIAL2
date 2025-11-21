@@ -8,9 +8,18 @@ import crypto from "crypto";
 import { createTutoringSession } from "./google-calendar";
 import { hashPassword, verifyPassword, verifyAdminCredentials } from "./auth";
 
-const stripe = process.env.STRIPE_SECRET_KEY 
-  ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-10-29.clover" })
+// Use test key in development, production key otherwise
+const stripeKey = process.env.NODE_ENV === 'development' 
+  ? process.env.TESTING_STRIPE_SECRET_KEY 
+  : process.env.STRIPE_SECRET_KEY;
+
+const stripe = stripeKey 
+  ? new Stripe(stripeKey, { apiVersion: "2025-10-29.clover" })
   : null;
+
+if (process.env.NODE_ENV === 'development') {
+  console.log(`[Stripe] Using ${stripeKey ? 'TESTING_STRIPE_SECRET_KEY' : 'no Stripe key'}`);
+}
 
 // Generate HMAC token for booking verification
 const BOOKING_TOKEN_SECRET = process.env.SESSION_SECRET || "edukt-booking-secret-key";
