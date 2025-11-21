@@ -8,10 +8,12 @@ import {
   type Sesion,
   type InsertSesion,
   type Review,
-  type InsertReview
+  type InsertReview,
+  type AvailabilitySlot,
+  type InsertAvailabilitySlot
 } from "@shared/schema";
 import { db } from "./db";
-import { users, tutors, alumnos, sesiones, reviews } from "@shared/schema";
+import { users, tutors, alumnos, sesiones, reviews, availabilitySlots } from "@shared/schema";
 import { eq, and, avg } from "drizzle-orm";
 
 export interface IStorage {
@@ -24,6 +26,7 @@ export interface IStorage {
   getTutorByEmail(email: string): Promise<Tutor | undefined>;
   getTutorsByStatus(status: string): Promise<Tutor[]>;
   updateTutorStatus(id: string, status: string): Promise<Tutor | undefined>;
+  updateTutorAvailability(id: string, isAvailable: boolean): Promise<Tutor | undefined>;
   getAllApprovedTutors(): Promise<Tutor[]>;
   
   createAlumno(alumno: InsertAlumno): Promise<Alumno>;
@@ -41,6 +44,10 @@ export interface IStorage {
   createReview(review: InsertReview): Promise<Review>;
   getReviewsByTutor(tutorId: string): Promise<Review[]>;
   getAverageRatingForTutor(tutorId: string): Promise<number>;
+  
+  createAvailabilitySlot(slot: InsertAvailabilitySlot): Promise<AvailabilitySlot>;
+  getAvailabilitySlotsByTutor(tutorId: string): Promise<AvailabilitySlot[]>;
+  deleteAvailabilitySlot(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -84,6 +91,14 @@ export class DbStorage implements IStorage {
   async updateTutorStatus(id: string, status: string): Promise<Tutor | undefined> {
     const result = await db.update(tutors)
       .set({ status })
+      .where(eq(tutors.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateTutorAvailability(id: string, isAvailable: boolean): Promise<Tutor | undefined> {
+    const result = await db.update(tutors)
+      .set({ isAvailable })
       .where(eq(tutors.id, id))
       .returning();
     return result[0];
@@ -164,6 +179,25 @@ export class DbStorage implements IStorage {
       .where(eq(reviews.tutorId, tutorId));
     
     return result[0]?.avg ? Number(result[0].avg) : 0;
+  }
+
+  async createAvailabilitySlot(slot: InsertAvailabilitySlot): Promise<AvailabilitySlot> {
+    const result = await db.insert(availabilitySlots).values(slot).returning();
+    return result[0];
+  }
+
+  async getAvailabilitySlotsByTutor(tutorId: string): Promise<AvailabilitySlot[]> {
+    return await db.select().from(availabilitySlots)
+      .where(and(
+        eq(availabilitySlots.tutorId, tutorId),
+        eq(availabilitySlots.active, true)
+      ));
+  }
+
+  async deleteAvailabilitySlot(id: string): Promise<void> {
+    await db.update(availabilitySlots)
+      .set({ active: false })
+      .where(eq(availabilitySlots.id, id));
   }
 }
 
