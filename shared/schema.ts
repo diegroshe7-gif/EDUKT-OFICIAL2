@@ -24,6 +24,11 @@ export const tutors = pgTable("tutors", {
   clabe: text("clabe").notNull(),
   banco: text("banco").notNull(),
   rfc: text("rfc").notNull(),
+  fechaNacimiento: timestamp("fecha_nacimiento").notNull(),
+  direccion: text("direccion").notNull(),
+  ciudad: text("ciudad").notNull(),
+  estado: text("estado").notNull(),
+  codigoPostal: text("codigo_postal").notNull(),
   status: text("status").notNull().default("pendiente"),
   isAvailable: boolean("is_available").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -36,6 +41,14 @@ export const insertTutorSchema = createInsertSchema(tutors, {
   clabe: z.string().regex(/^\d{18}$/, "La CLABE debe tener exactamente 18 dígitos"),
   banco: z.string().min(1, "El nombre del banco es requerido"),
   rfc: z.string().regex(/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/, "RFC inválido (debe tener 12 o 13 caracteres)"),
+  fechaNacimiento: z.coerce.date().refine((date) => {
+    const age = Math.floor((Date.now() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    return age >= 18;
+  }, "Debes ser mayor de 18 años"),
+  direccion: z.string().min(1, "La dirección es requerida"),
+  ciudad: z.string().min(1, "La ciudad es requerida"),
+  estado: z.string().min(1, "El estado es requerido"),
+  codigoPostal: z.string().regex(/^\d{5}$/, "El código postal debe tener 5 dígitos"),
 }).omit({
   id: true,
   createdAt: true,

@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, FileText, Calendar, DollarSign, MapPin, CreditCard } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Calendar, DollarSign, MapPin, CreditCard, IdCard } from "lucide-react";
 
 interface TutorFormProps {
   onSubmit: (data: any) => void;
@@ -33,6 +33,11 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     clabe: "",
     banco: "",
     rfc: "",
+    fechaNacimiento: "",
+    direccion: "",
+    ciudad: "",
+    estado: "",
+    codigoPostal: "",
   });
 
   const handleChange = (field: string, value: string) => {
@@ -159,6 +164,84 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                     value={formData.fotoPerfil}
                     onChange={(e) => handleChange("fotoPerfil", e.target.value)}
                     data-testid="input-foto-perfil"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IdCard className="h-5 w-5" />
+                Información para Verificación
+              </CardTitle>
+              <CardDescription>
+                Requerido por Stripe para procesar pagos legalmente en México
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fechaNacimiento">Fecha de Nacimiento *</Label>
+                <Input
+                  id="fechaNacimiento"
+                  type="date"
+                  value={formData.fechaNacimiento}
+                  onChange={(e) => handleChange("fechaNacimiento", e.target.value)}
+                  required
+                  data-testid="input-fecha-nacimiento"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Debes ser mayor de 18 años
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="direccion">Dirección Completa *</Label>
+                <Input
+                  id="direccion"
+                  placeholder="Ej: Calle Reforma #123, Col. Centro"
+                  value={formData.direccion}
+                  onChange={(e) => handleChange("direccion", e.target.value)}
+                  required
+                  data-testid="input-direccion"
+                />
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ciudad">Ciudad *</Label>
+                  <Input
+                    id="ciudad"
+                    placeholder="Ej: Guadalajara"
+                    value={formData.ciudad}
+                    onChange={(e) => handleChange("ciudad", e.target.value)}
+                    required
+                    data-testid="input-ciudad"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="estado">Estado *</Label>
+                  <Input
+                    id="estado"
+                    placeholder="Ej: Jalisco"
+                    value={formData.estado}
+                    onChange={(e) => handleChange("estado", e.target.value)}
+                    required
+                    data-testid="input-estado"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="codigoPostal">Código Postal *</Label>
+                  <Input
+                    id="codigoPostal"
+                    placeholder="12345 (5 dígitos)"
+                    value={formData.codigoPostal}
+                    onChange={(e) => handleChange("codigoPostal", e.target.value)}
+                    maxLength={5}
+                    pattern="\d{5}"
+                    required
+                    data-testid="input-codigo-postal"
                   />
                 </div>
               </div>
