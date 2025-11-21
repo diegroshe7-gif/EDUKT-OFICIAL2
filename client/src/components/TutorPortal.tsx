@@ -42,6 +42,7 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
   const { toast } = useToast();
   const [view, setView] = useState<'availability' | 'calendar'>('availability');
   const [tutor, setTutor] = useState<any>(null);
+  const [tutorId, setTutorId] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newSlot, setNewSlot] = useState({
     dayOfWeek: 1,
@@ -54,14 +55,17 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
     if (savedTutor) {
       const tutorData = JSON.parse(savedTutor);
       setTutor(tutorData);
+      if (tutorData.id) {
+        setTutorId(tutorData.id);
+      }
     }
   }, []);
 
   // Fetch fresh tutor data to get isAvailable status
   const { data: freshTutorData } = useQuery({
     queryKey: ['/api/tutors/approved'],
-    enabled: !!tutor?.id,
-    select: (tutors: any[]) => tutors.find((t: any) => t.id === tutor?.id),
+    enabled: !!tutorId,
+    select: (tutors: any[]) => tutors.find((t: any) => t.id === tutorId),
   });
 
   // Update tutor with fresh data when available
@@ -73,16 +77,17 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
   }, [freshTutorData]);
 
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
-    queryKey: ['/api/tutors', tutor?.id, 'availability'],
-    enabled: !!tutor?.id,
+    queryKey: ['/api/tutors', tutorId, 'availability'],
+    enabled: !!tutorId,
   });
 
   const createSlotMutation = useMutation({
     mutationFn: async (slot: any) => {
-      return apiRequest(`/api/tutors/${tutor.id}/availability`, 'POST', slot);
+      if (!tutorId) throw new Error("Tutor ID no disponible");
+      return apiRequest('POST', `/api/tutors/${tutorId}/availability`, slot);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/tutors', tutor?.id, 'availability'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tutors', tutorId, 'availability'] });
       toast({
         title: "Horario agregado",
         description: "La franja horaria se creó exitosamente"
@@ -101,10 +106,10 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
 
   const deleteSlotMutation = useMutation({
     mutationFn: async (slotId: string) => {
-      return apiRequest(`/api/availability-slots/${slotId}`, 'DELETE');
+      return apiRequest('DELETE', `/api/availability-slots/${slotId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/tutors', tutor?.id, 'availability'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tutors', tutorId, 'availability'] });
       toast({
         title: "Horario eliminado",
         description: "La franja horaria se eliminó exitosamente"
@@ -121,7 +126,8 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
 
   const toggleAvailabilityMutation = useMutation({
     mutationFn: async (isAvailable: boolean) => {
-      return apiRequest(`/api/tutors/${tutor.id}/toggle-availability`, 'PATCH', { isAvailable });
+      if (!tutorId) throw new Error("Tutor ID no disponible");
+      return apiRequest('PATCH', `/api/tutors/${tutorId}/toggle-availability`, { isAvailable });
     },
     onSuccess: (updatedTutor: any) => {
       setTutor(updatedTutor);
@@ -175,7 +181,7 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
   }
 
   if (view === 'calendar') {
-    return <TeacherCalendar tutorId={tutor.id} onBack={() => setView('availability')} />;
+    return <TeacherCalendar tutorId={tutorId} onBack={() => setView('availability')} />;
   }
 
   const sortedSlots = Array.isArray(slots) ? [...slots].sort((a: any, b: any) => {
