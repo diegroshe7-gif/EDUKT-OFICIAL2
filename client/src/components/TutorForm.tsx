@@ -277,7 +277,7 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="online">Online (Zoom)</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
                       <SelectItem value="presencial">Presencial</SelectItem>
                       <SelectItem value="mixta">Mixta</SelectItem>
                     </SelectContent>
@@ -427,35 +427,6 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                   onChange={(e) => handleChange("cv_url", e.target.value)}
                   data-testid="input-cv-url"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cal_link">Enlace de Cal.com (opcional)</Label>
-                <Input
-                  id="cal_link"
-                  type="url"
-                  placeholder="https://cal.com/usuario/tutoria-60min"
-                  value={formData.cal_link}
-                  onChange={(e) => handleChange("cal_link", e.target.value)}
-                  data-testid="input-cal-link"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Si tienes Cal.com, los alumnos podrán agendar clases directamente
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="stripe_account_id">Stripe Connect Account ID (opcional)</Label>
-                <Input
-                  id="stripe_account_id"
-                  placeholder="acct_..."
-                  value={formData.stripe_account_id}
-                  onChange={(e) => handleChange("stripe_account_id", e.target.value)}
-                  data-testid="input-stripe-id"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Se completa después del proceso de onboarding de Stripe
-                </p>
               </div>
             </CardContent>
           </Card>
