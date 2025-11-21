@@ -26,7 +26,7 @@ Preferred communication style: Simple, everyday language.
 - **API:** RESTful architecture, `/api` prefix, custom middleware for logging and JSON parsing.
 - **Database:** Neon serverless PostgreSQL, accessed via Drizzle ORM for type-safe interactions. Uses a schema-first approach with shared type definitions.
 - **Database Schema:**
-    - `tutors`: Stores tutor profiles with an approval workflow. Includes personal, professional, and integration fields (Stripe, Cal.com).
+    - `tutors`: Stores tutor profiles with an approval workflow. Includes personal info, professional details, KYC data (date of birth, full address), banking information (CLABE, RFC, bank name), and Stripe Connect account ID.
     - `alumnos`: Student registration.
     - `sesiones`: Scheduled tutoring sessions, linked to tutors and students, with payment intent IDs for idempotency.
     - `reviews`: Student ratings and feedback for tutors.
@@ -35,13 +35,13 @@ Preferred communication style: Simple, everyday language.
 - **API Endpoints:** Comprehensive set of endpoints for tutor, student, admin, session, review, and availability management, including payment initiation and confirmation.
 - **Key Decisions:** Separation of concerns (`/client`, `/server`, `/shared`), shared schema definitions, Zod validation (client/server), storage abstraction, and environment-based configuration.
 - **Security:** HMAC-SHA256 signed booking tokens for payment security, 24-hour token expiration, and idempotent session creation using unique `paymentIntentId`. Authentication is password-based with bcrypt hashing; however, server-side student authentication (JWT/sessions) is noted as a future enhancement for production.
-- **Current Features:** Implemented user roles and authentication, tutor approval workflow, student registration, tutor search/filtering, Stripe payment processing with service fees, automatic session creation, enhanced tutor profiles, tutor availability system, teacher calendar, post-class rating system, financial reporting, and banking information collection for tutors, including Stripe Connect automatic transfers.
+- **Current Features:** Implemented user roles and authentication, tutor approval workflow with KYC verification, student registration, tutor search/filtering, Stripe payment processing with 8% service fee, automatic session creation, enhanced tutor profiles, tutor availability system, teacher calendar, post-class rating system, financial reporting, and Stripe Connect Custom accounts for automatic payouts to tutors in Mexico.
 
 ## External Dependencies
 
-- **Payment Processing:** Stripe (Stripe Connect for payouts, Payment Intents API for collection, Webhook handling). Uses `@stripe/stripe-js`, `@stripe/react-stripe-js` (frontend) and `stripe` SDK (backend).
+- **Payment Processing:** Stripe (Stripe Connect Custom accounts for automatic payouts, Payment Intents API for collection). Uses `@stripe/stripe-js`, `@stripe/react-stripe-js` (frontend) and `stripe` SDK (backend). Platform collects 8% service fee, tutors receive 92% automatically via Stripe Connect transfers to their Mexican bank accounts.
 - **Database:** Neon Serverless PostgreSQL (`DATABASE_URL`). Utilizes `@neondatabase/serverless` for WebSocket-based connections.
-- **Scheduling Integration:** Cal.com (tutors provide `calLink`; external service).
+- **Scheduling Integration:** Google Calendar API for automated Meet link generation and calendar event creation.
 - **File Storage:** No built-in file upload; `cvUrl` fields assume external storage.
 - **Development Tools:** Replit-specific plugins (e.g., Cartographer, Dev banner).
 - **Third-Party UI Libraries:** Lucide React (icons), Radix UI (primitives), React Hook Form with Zod, date-fns, cmdk, vaul.
