@@ -295,6 +295,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sessionDate.setDate(sessionDate.getDate() + 7);
       sessionDate.setHours(10, 0, 0, 0); // 10 AM by default
 
+      // Calculate payment amounts
+      const subtotal = tutor.tarifa * parseInt(hours);
+      const platformFee = Math.round(subtotal * 0.08);
+      const total = subtotal + platformFee;
+
       // Create Google Calendar event with Google Meet link
       let meetLink = '';
       let googleCalendarEventId = '';
@@ -316,7 +321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Continue session creation even if calendar fails
       }
 
-      // Create session with verified data
+      // Create session with verified data and payment amounts
       const sesion = await storage.createSesion({
         tutorId,
         alumnoId,
@@ -325,6 +330,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         meetLink,
         googleCalendarEventId,
         paymentIntentId,
+        subtotal,
+        platformFee,
+        total,
       });
 
       res.json(sesion);
@@ -494,6 +502,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching alumno sesiones:", error);
       res.status(500).json({ error: "Failed to fetch sesiones" });
+    }
+  });
+
+  // Admin endpoint: Get all sessions
+  app.get("/api/sesiones", async (req, res) => {
+    try {
+      const sesiones = await storage.getAllSesiones();
+      res.json(sesiones);
+    } catch (error) {
+      console.error("Error fetching all sesiones:", error);
+      res.status(500).json({ error: "Failed to fetch sesiones" });
+    }
+  });
+
+  // Admin endpoint: Get all alumnos
+  app.get("/api/alumnos", async (req, res) => {
+    try {
+      const alumnos = await storage.getAllAlumnos();
+      res.json(alumnos);
+    } catch (error) {
+      console.error("Error fetching all alumnos:", error);
+      res.status(500).json({ error: "Failed to fetch alumnos" });
     }
   });
 

@@ -32,6 +32,7 @@ export interface IStorage {
   createAlumno(alumno: InsertAlumno): Promise<Alumno>;
   getAlumnoById(id: string): Promise<Alumno | undefined>;
   getAlumnoByEmail(email: string): Promise<Alumno | undefined>;
+  getAllAlumnos(): Promise<Alumno[]>;
   
   createSesion(sesion: InsertSesion): Promise<Sesion>;
   getSesionById(id: string): Promise<Sesion | undefined>;
@@ -121,6 +122,10 @@ export class DbStorage implements IStorage {
   async getAlumnoByEmail(email: string): Promise<Alumno | undefined> {
     const result = await db.select().from(alumnos).where(eq(alumnos.email, email)).limit(1);
     return result[0];
+  }
+
+  async getAllAlumnos(): Promise<Alumno[]> {
+    return await db.select().from(alumnos);
   }
 
   async createSesion(sesion: InsertSesion): Promise<Sesion> {

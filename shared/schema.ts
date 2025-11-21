@@ -83,12 +83,18 @@ export const sesiones = pgTable("sesiones", {
   meetLink: text("meet_link"),
   googleCalendarEventId: text("google_calendar_event_id"),
   paymentIntentId: text("payment_intent_id").notNull().unique(),
+  subtotal: integer("subtotal").notNull().default(0),
+  platformFee: integer("platform_fee").notNull().default(0),
+  total: integer("total").notNull().default(0),
   status: text("status").notNull().default("pendiente"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertSesionSchema = createInsertSchema(sesiones, {
   horas: z.coerce.number().int().positive(),
+  subtotal: z.coerce.number().int().positive(),
+  platformFee: z.coerce.number().int().nonnegative(),
+  total: z.coerce.number().int().positive(),
 }).omit({
   id: true,
   createdAt: true,
