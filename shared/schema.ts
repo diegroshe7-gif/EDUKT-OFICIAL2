@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -22,6 +22,7 @@ export const tutors = pgTable("tutors", {
   stripeAccountId: text("stripe_account_id"),
   calLink: text("cal_link"),
   status: text("status").notNull().default("pendiente"),
+  isAvailable: boolean("is_available").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -116,3 +117,25 @@ export const insertReviewSchema = createInsertSchema(reviews, {
 
 export type InsertReview = z.infer<typeof insertReviewSchema>;
 export type Review = typeof reviews.$inferSelect;
+
+export const availabilitySlots = pgTable("availability_slots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tutorId: varchar("tutor_id").notNull().references(() => tutors.id),
+  dayOfWeek: integer("day_of_week").notNull(),
+  startTime: integer("start_time").notNull(),
+  endTime: integer("end_time").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAvailabilitySlotSchema = createInsertSchema(availabilitySlots, {
+  dayOfWeek: z.coerce.number().int().min(0).max(6),
+  startTime: z.coerce.number().int().min(0).max(1439),
+  endTime: z.coerce.number().int().min(0).max(1439),
+}).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAvailabilitySlot = z.infer<typeof insertAvailabilitySlotSchema>;
+export type AvailabilitySlot = typeof availabilitySlots.$inferSelect;
