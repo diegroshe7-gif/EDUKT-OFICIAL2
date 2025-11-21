@@ -52,9 +52,25 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
   useEffect(() => {
     const savedTutor = localStorage.getItem('edukt_tutor');
     if (savedTutor) {
-      setTutor(JSON.parse(savedTutor));
+      const tutorData = JSON.parse(savedTutor);
+      setTutor(tutorData);
     }
   }, []);
+
+  // Fetch fresh tutor data to get isAvailable status
+  const { data: freshTutorData } = useQuery({
+    queryKey: ['/api/tutors/approved'],
+    enabled: !!tutor?.id,
+    select: (tutors: any[]) => tutors.find((t: any) => t.id === tutor?.id),
+  });
+
+  // Update tutor with fresh data when available
+  useEffect(() => {
+    if (freshTutorData) {
+      setTutor(freshTutorData);
+      localStorage.setItem('edukt_tutor', JSON.stringify(freshTutorData));
+    }
+  }, [freshTutorData]);
 
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
     queryKey: ['/api/tutors', tutor?.id, 'availability'],
