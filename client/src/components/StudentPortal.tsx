@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Search, Filter, User } from "lucide-react";
 import TutorCard from "./TutorCard";
+import TutorProfile from "./TutorProfile";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ export default function StudentPortal({ tutors, onBack, onCheckout, alumno }: St
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [hours, setHours] = useState(1);
+  const [viewingProfile, setViewingProfile] = useState<any>(null);
 
   const filteredTutors = tutors.filter(tutor => {
     const matchesSearch = tutor.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -68,6 +70,19 @@ export default function StudentPortal({ tutors, onBack, onCheckout, alumno }: St
 
   if (showMySessions && alumno) {
     return <StudentSessions alumnoId={alumno.id} onBack={() => setShowMySessions(false)} />;
+  }
+
+  if (viewingProfile && alumno) {
+    return (
+      <TutorProfile
+        tutor={viewingProfile}
+        alumnoId={alumno.id}
+        onBack={() => setViewingProfile(null)}
+        onBookingComplete={() => {
+          setViewingProfile(null);
+        }}
+      />
+    );
   }
 
   return (
@@ -148,7 +163,7 @@ export default function StudentPortal({ tutors, onBack, onCheckout, alumno }: St
                 key={index}
                 tutor={tutor}
                 onSchedule={handleSchedule}
-                onViewProfile={(t) => console.log('View profile:', t)}
+                onViewProfile={(t) => setViewingProfile(t)}
               />
             ))}
           </div>
