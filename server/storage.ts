@@ -27,6 +27,7 @@ export interface IStorage {
   getTutorsByStatus(status: string): Promise<Tutor[]>;
   updateTutorStatus(id: string, status: string): Promise<Tutor | undefined>;
   updateTutorAvailability(id: string, isAvailable: boolean): Promise<Tutor | undefined>;
+  updateTutorStripeAccount(id: string, stripeAccountId: string): Promise<Tutor | undefined>;
   getAllApprovedTutors(): Promise<Tutor[]>;
   
   createAlumno(alumno: InsertAlumno): Promise<Alumno>;
@@ -100,6 +101,14 @@ export class DbStorage implements IStorage {
   async updateTutorAvailability(id: string, isAvailable: boolean): Promise<Tutor | undefined> {
     const result = await db.update(tutors)
       .set({ isAvailable })
+      .where(eq(tutors.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateTutorStripeAccount(id: string, stripeAccountId: string): Promise<Tutor | undefined> {
+    const result = await db.update(tutors)
+      .set({ stripeAccountId })
       .where(eq(tutors.id, id))
       .returning();
     return result[0];
