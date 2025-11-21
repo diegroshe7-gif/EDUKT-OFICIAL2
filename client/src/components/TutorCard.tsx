@@ -107,21 +107,13 @@ export default function TutorCard({ tutor, onSchedule, onViewProfile }: TutorCar
         </div>
       </CardContent>
 
-      <CardFooter className="gap-2 pt-4 border-t flex-wrap">
+      <CardFooter className="pt-4 border-t">
         <Button 
-          variant="outline" 
-          className="flex-1 min-w-[120px]"
+          className="w-full bg-accent hover:bg-accent text-accent-foreground"
           onClick={() => onViewProfile?.(tutor)}
           data-testid={`button-view-profile-${tutor.id}`}
         >
           Ver Perfil
-        </Button>
-        <Button 
-          className="flex-1 min-w-[120px] bg-accent hover:bg-accent text-accent-foreground"
-          onClick={() => onSchedule?.(tutor)}
-          data-testid={`button-schedule-${tutor.id}`}
-        >
-          Agendar Clase
         </Button>
       </CardFooter>
     </Card>
