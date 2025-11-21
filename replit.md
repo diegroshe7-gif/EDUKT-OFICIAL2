@@ -2,7 +2,7 @@
 
 ## Overview
 
-EDUKT is a tutoring marketplace platform that connects students with qualified tutors. The platform provides three distinct user portals: students can browse and book sessions with approved tutors, tutors can register and create their profiles, and administrators can review and approve tutor applications. The system handles the complete tutoring lifecycle from tutor registration through payment processing and session scheduling.
+EDUKT is a tutoring marketplace platform designed to connect students with qualified tutors. It features three distinct user portals for students, tutors, and administrators, managing the entire tutoring lifecycle from registration and approval to session scheduling and payment processing. The platform aims to provide a trusted and efficient environment for online tutoring, inspired by successful marketplace models like Airbnb and Upwork.
 
 ## User Preferences
 
@@ -10,235 +10,38 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
+### Frontend
 
-**Framework & Build System**
-- React 18 with TypeScript as the primary UI framework
-- Vite as the build tool and development server, configured with HMR (Hot Module Replacement)
-- Wouter for lightweight client-side routing
-- Single-page application (SPA) architecture with component-based design
+- **Framework:** React 18 with TypeScript.
+- **Build Tool:** Vite, configured with HMR.
+- **Routing:** Wouter for client-side routing.
+- **UI:** shadcn/ui component library built on Radix UI, styled with Tailwind CSS.
+- **Design System:** Custom guidelines (`design_guidelines.md`) with specific typography and spacing, featuring Framer Motion for animations.
+- **State Management:** TanStack Query for server state and caching; React's `useState` for UI state.
+- **Design Philosophy:** Responsive, mobile-first design emphasizing credibility and trust through clean, professional aesthetics and interactive elements. Three-role system (Student, Tutor, Admin) accessed from a central landing page.
 
-**UI Component System**
-- shadcn/ui component library built on Radix UI primitives for accessible, unstyled components
-- Tailwind CSS for utility-first styling with custom design tokens
-- Custom design system defined in `design_guidelines.md` with specific typography (Inter for UI, Sora for headings) and spacing guidelines
-- Framer Motion for animations and transitions
-- Component examples directory (`client/src/components/examples/`) for development and testing
+### Backend
 
-**State Management**
-- TanStack Query (React Query) for server state management, caching, and data fetching
-- Local React state (useState) for UI state within components
-- Query invalidation pattern for keeping data fresh after mutations
+- **Server:** Express.js with TypeScript, Node.js runtime.
+- **API:** RESTful architecture, `/api` prefix, custom middleware for logging and JSON parsing.
+- **Database:** Neon serverless PostgreSQL, accessed via Drizzle ORM for type-safe interactions. Uses a schema-first approach with shared type definitions.
+- **Database Schema:**
+    - `tutors`: Stores tutor profiles with an approval workflow. Includes personal, professional, and integration fields (Stripe, Cal.com).
+    - `alumnos`: Student registration.
+    - `sesiones`: Scheduled tutoring sessions, linked to tutors and students, with payment intent IDs for idempotency.
+    - `reviews`: Student ratings and feedback for tutors.
+    - `availability_slots`: Stores tutors' recurring weekly availability.
+    - `users`: Simple authentication (currently unused).
+- **API Endpoints:** Comprehensive set of endpoints for tutor, student, admin, session, review, and availability management, including payment initiation and confirmation.
+- **Key Decisions:** Separation of concerns (`/client`, `/server`, `/shared`), shared schema definitions, Zod validation (client/server), storage abstraction, and environment-based configuration.
+- **Security:** HMAC-SHA256 signed booking tokens for payment security, 24-hour token expiration, and idempotent session creation using unique `paymentIntentId`. Authentication is password-based with bcrypt hashing; however, server-side student authentication (JWT/sessions) is noted as a future enhancement for production.
+- **Current Features:** Implemented user roles and authentication, tutor approval workflow, student registration, tutor search/filtering, Stripe payment processing with service fees, automatic session creation, enhanced tutor profiles, tutor availability system, teacher calendar, post-class rating system, financial reporting, and banking information collection for tutors, including Stripe Connect automatic transfers.
 
-**Key Design Decisions**
-- Design inspired by Airbnb's marketplace trust patterns and Upwork's service provider profiles
-- Emphasis on credibility and trust through clean, professional design
-- Responsive design with mobile-first approach
-- Hover elevation effects for interactive elements
-- Three-role system (Student, Tutor, Admin) accessed from a central landing page
+## External Dependencies
 
-### Backend Architecture
-
-**Server Framework**
-- Express.js server with TypeScript
-- Node.js runtime environment
-- RESTful API architecture with `/api` prefix for all endpoints
-- Custom middleware for request logging and JSON parsing with raw body preservation (for webhook verification)
-
-**Database Layer**
-- Drizzle ORM for type-safe database interactions
-- Neon serverless PostgreSQL as the database provider
-- WebSocket connection pooling for database connections
-- Schema-first approach with shared type definitions between client and server
-
-**Database Schema**
-- `tutors` table: Stores tutor profiles with status workflow (pendiente → aprobado/rechazado)
-  - Core fields: nombre, edad, email, password (bcrypt hashed), telefono, materias, modalidad, ubicacion, tarifa, disponibilidad
-  - Integration fields: stripeAccountId, calLink, cvUrl, bio, universidad, fotoPerfil
-  - Status tracking with createdAt timestamps
-  - Tutors must be approved before accessing portal
-- `alumnos` table: Student registration system
-  - Fields: nombre, apellido, edad, email, password (bcrypt hashed)
-  - Students can access portal immediately after registration
-  - Session data stored in localStorage on client-side
-- `sesiones` table: Scheduled tutoring sessions
-  - Links tutors to students with booking details
-  - Fields: tutorId, alumnoId, fecha, horas, zoomLink, googleCalendarEventId, paymentIntentId, status
-  - paymentIntentId: NOT NULL, UNIQUE - used for idempotent session creation
-  - Created automatically after successful payment verification
-  - Status tracking (default: "pendiente")
-- `reviews` table: Student ratings and feedback for tutors
-  - Fields: tutorId, alumnoId, calificacion (0-5), comentario
-  - Allows students to rate completed sessions
-- `availability_slots` table: Tutor recurring availability schedule (November 2025)
-  - Fields: id, tutorId (FK to tutors), dayOfWeek (0-6 for Sunday-Saturday), startTime (minutes from midnight), endTime (minutes from midnight), active (boolean)
-  - Stores recurring weekly time slots when tutors are available
-  - Example: dayOfWeek=1, startTime=840, endTime=960 means "Every Monday from 14:00 to 16:00"
-  - Used with `isAvailable` toggle on tutors table to control booking permissions
-- `users` table: Simple authentication structure with username and password (currently unused)
-
-**API Structure**
-- Tutor endpoints:
-  - POST `/api/tutors` - Create new tutor application (hashes password, returns without password field)
-  - POST `/api/tutors/login` - Tutor login with email and password (verifies bcrypt hash)
-  - GET `/api/tutors/approved` - Retrieve all approved tutors for student browsing
-  - GET `/api/tutors/pending` - Admin endpoint to view pending applications
-  - GET `/api/tutors/rejected` - Admin endpoint to view rejected applications
-  - PATCH `/api/tutors/:id/approve` - Admin endpoint to approve tutor
-  - PATCH `/api/tutors/:id/reject` - Admin endpoint to reject tutor
-- Alumno (student) endpoints:
-  - POST `/api/alumnos` - Register new student (hashes password, returns without password field)
-  - POST `/api/alumnos/login` - Student login with email and password (verifies bcrypt hash)
-  - GET `/api/alumnos/:id` - Retrieve student by ID (password excluded from response)
-- Admin endpoints:
-  - POST `/api/admin/login` - Admin login with username "diegovictor778" and password from ADMINISTRADOR_KEY secret
-- Session endpoints:
-  - POST `/api/sesiones` - Create new session (internal use)
-  - GET `/api/sesiones/tutor/:tutorId` - Get all sessions for a tutor
-  - GET `/api/sesiones/alumno/:alumnoId` - Get all sessions for a student
-- Review endpoints:
-  - POST `/api/reviews` - Create new review
-  - GET `/api/reviews/tutor/:tutorId` - Get all reviews for a tutor
-- Availability endpoints (November 2025):
-  - GET `/api/tutors/:id/availability` - Get all availability slots for a tutor
-  - POST `/api/tutors/:id/availability` - Create new availability slot (body: {dayOfWeek, startTime, endTime})
-  - DELETE `/api/availability-slots/:id` - Delete an availability slot
-  - PATCH `/api/tutors/:id/toggle-availability` - Toggle tutor's availability status (body: {isAvailable})
-  - POST `/api/book-session` - Calculate next occurrence date for booking (body: {slotId, alumnoId, tutorId, horas})
-- Payment endpoints:
-  - POST `/api/create-payment-intent` - Initialize payment flow
-    - Validates alumno and tutor existence and status
-    - Creates Stripe payment intent with metadata (tutorId, alumnoId, hours)
-    - Generates HMAC-signed booking token binding payment to specific student/tutor
-    - Returns: clientSecret, bookingToken, amount breakdown
-  - POST `/api/confirm-session` - Verify payment and create session
-    - Requires: paymentIntentId, bookingToken, alumnoId, tutorId
-    - Validates booking token signature and expiration
-    - Retrieves payment from Stripe and verifies status = "succeeded"
-    - Cross-validates provided IDs against Stripe metadata
-    - Checks for existing session by paymentIntentId (idempotency)
-    - Creates session record with paymentIntentId for deduplication
-
-**Key Architectural Decisions**
-- Separation of concerns with distinct `/client`, `/server`, and `/shared` directories
-- Shared schema definitions between frontend and backend prevent type mismatches
-- Zod validation on both client (form validation) and server (API validation)
-- Storage abstraction layer (`IStorage` interface) allows for potential database switching
-- Environment-based configuration for development vs. production
-
-### External Dependencies
-
-**Payment Processing**
-- Stripe integration for payment processing
-  - Stripe Connect for tutor payouts (stored as `stripeAccountId`)
-  - Payment Intents API for secure payment collection
-  - Webhook handling for payment event verification (uses raw body parsing)
-  - Frontend: `@stripe/stripe-js` and `@stripe/react-stripe-js`
-  - Backend: `stripe` SDK with API version "2025-10-29.clover"
-  - Requires `STRIPE_SECRET_KEY` and `VITE_STRIPE_PUBLIC_KEY` environment variables
-
-**Database**
-- Neon Serverless PostgreSQL
-  - Requires `DATABASE_URL` environment variable
-  - WebSocket-based connections using `ws` package
-  - Connection pooling via `@neondatabase/serverless`
-
-**Scheduling Integration**
-- Cal.com integration for session scheduling
-  - Tutors provide `calLink` for direct booking
-  - External service, no backend integration required
-  - Links open in new tab for booking flow
-
-**File Storage**
-- CV/Resume uploads referenced by URL (`cvUrl` field)
-- No built-in file upload handler - expects external storage solution or future implementation
-
-**Development Tools**
-- Replit-specific plugins for development environment
-  - Runtime error modal overlay
-  - Cartographer for code navigation
-  - Dev banner for environment indicators
-  - Conditional loading only in development mode
-
-**Third-Party UI Libraries**
-- Lucide React for icon components
-- Radix UI primitives for accessible component foundations
-- React Hook Form with Zod resolvers for form management
-- date-fns for date manipulation
-- cmdk for command palette functionality
-- vaul for drawer components
-
-**Current Features & Implementation Status**
-- ✅ Three-role system (Student, Tutor, Admin) with password-based authentication
-- ✅ Secure password authentication using bcrypt (12 rounds) for all roles
-- ✅ Login endpoints for students, tutors, and admin with credential verification
-- ✅ Tutor approval workflow (pending → approved/rejected) - tutors must be approved before portal access
-- ✅ Student registration and login with immediate portal access
-- ✅ Admin login using username "diegovictor778" with password from ADMINISTRADOR_KEY secret
-- ✅ Tutor search and filtering by name, subject, and modality
-- ✅ Stripe payment processing with 8% service fee
-- ✅ Automatic session creation after successful payment
-- ✅ Enhanced tutor profiles with university and optional photo
-- ✅ **Tutor availability system (November 2025):**
-  - Tutors create recurring time slots (day of week + time range)
-  - Toggle availability status (on/off) to control bookings
-  - Students view tutor profiles with available time slots
-  - Intelligent date calculation: booking "Monday" from Tuesday schedules next Monday
-  - Complete CRUD for availability slots with validation
-  - Time slots stored as minutes from midnight for precision
-- ✅ Teacher calendar view showing scheduled sessions
-- ✅ Post-class rating system (0-5 stars) with comments
-- ✅ Display of ratings/reviews on tutor profiles
-- ✅ **Financial reporting (November 2025):**
-  - AdminReports: complete revenue analytics, platform fees, transaction history
-  - TutorIncome: tutor earnings, session history, monthly breakdown with date filters
-  - All financial data persisted in sessions table (subtotal, platformFee, total)
-- ✅ **Banking information for tutors (November 2025):**
-  - Tutors provide CLABE (18 digits), bank name, and RFC during registration
-  - Server-side validation of CLABE and RFC formats
-  - Banking info required before tutor approval
-  - Information stored for future payout implementation
-- 🔄 Google Calendar integration (connector available, not yet configured)
-- 🔄 Zoom integration for automated meeting links (no native connector available)
-- 🔄 **Stripe Connect automatic transfers (in progress):**
-  - Banking info collected and validated
-  - Full Stripe Connect onboarding pending (requires KYC verification, TOS acceptance)
-  - Current workaround: Manual transfers using collected banking data
-
-**Security Implementation & Limitations**
-
-*Payment Security (November 2025)*
-- **Booking Token System**: HMAC-SHA256 signed tokens bind payment intents to specific student/tutor pairs
-  - Token format: `paymentIntentId:alumnoId:tutorId:timestamp:signature`
-  - 24-hour expiration window
-  - Server validates token signature and verifies IDs against Stripe metadata
-  - Prevents unauthorized session creation with leaked payment IDs
-- **Payment Verification Flow**:
-  1. `/api/create-payment-intent` validates student and tutor, creates Stripe payment, generates signed booking token
-  2. Client stores token and completes payment with Stripe
-  3. `/api/confirm-session` validates token, verifies payment with Stripe, cross-checks IDs against trusted Stripe metadata
-  4. Session created with `paymentIntentId` (NOT NULL, UNIQUE) for idempotent deduplication
-- **Security Measures**:
-  - ✅ HMAC-signed tokens prevent forgery
-  - ✅ Cross-validation against Stripe metadata prevents ID manipulation
-  - ✅ O(1) deduplication using unique `paymentIntentId` column
-  - ✅ Token expiration limits replay window
-  - ✅ Normalized error messages prevent information leakage
-  - ⚠️ **Limitation**: Without server-side student authentication (JWT/sessions), intercepted tokens can still be replayed within 24h window
-  - ⚠️ **Limitation**: No single-use token enforcement (tokens not marked as consumed server-side)
-
-*Authentication*
-- **No server-side authentication**: Student authentication uses localStorage only
-- Tutor/student identity validated at payment creation, not at session confirmation
-- Current implementation suitable for MVP/demo/educational purposes
-- **Production requirements**: Implement JWT or session-based authentication to fully prevent token replay attacks
-
-*Deduplication*
-- ✅ Sessions keyed by unique `paymentIntentId` to prevent double-charging
-- Database constraint prevents duplicate sessions for same payment
-
-**Missing/Optional Integrations**
-- No email notification service for tutor approval/rejection or booking confirmations
-- No real-time communication (could be added for tutor-student messaging)
-- No automated calendar invitations (Google Calendar connector available but not configured)
-- No automated Zoom meeting creation (requires manual API integration)
+- **Payment Processing:** Stripe (Stripe Connect for payouts, Payment Intents API for collection, Webhook handling). Uses `@stripe/stripe-js`, `@stripe/react-stripe-js` (frontend) and `stripe` SDK (backend).
+- **Database:** Neon Serverless PostgreSQL (`DATABASE_URL`). Utilizes `@neondatabase/serverless` for WebSocket-based connections.
+- **Scheduling Integration:** Cal.com (tutors provide `calLink`; external service).
+- **File Storage:** No built-in file upload; `cvUrl` fields assume external storage.
+- **Development Tools:** Replit-specific plugins (e.g., Cartographer, Dev banner).
+- **Third-Party UI Libraries:** Lucide React (icons), Radix UI (primitives), React Hook Form with Zod, date-fns, cmdk, vaul.

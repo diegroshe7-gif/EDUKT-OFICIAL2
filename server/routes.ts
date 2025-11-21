@@ -139,10 +139,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Tutor not found" });
       }
 
-      // Validate banking information is complete for payouts
+      // Validate all required KYC information is complete
       if (!tutorToApprove.clabe || !tutorToApprove.banco || !tutorToApprove.rfc) {
         return res.status(400).json({ 
-          error: "Información bancaria incompleta. El tutor debe proporcionar CLABE, banco y RFC para recibir pagos." 
+          error: "Información bancaria incompleta. El tutor debe proporcionar CLABE, banco y RFC." 
+        });
+      }
+
+      if (!tutorToApprove.fechaNacimiento || !tutorToApprove.direccion || 
+          !tutorToApprove.ciudad || !tutorToApprove.estado || !tutorToApprove.codigoPostal) {
+        return res.status(400).json({ 
+          error: "Información de verificación incompleta. El tutor debe proporcionar fecha de nacimiento, dirección completa, ciudad, estado y código postal." 
         });
       }
 
@@ -160,11 +167,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Approve the tutor - payouts will be handled via Stripe Transfers API
-      // when payments are processed, using the stored banking information
+      // Validate age (18+)
+      const birthDate = new Date(tutorToApprove.fechaNacimiento);
+      const age = Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      if (age < 18) {
+        return res.status(400).json({ 
+          error: "El tutor debe ser mayor de 18 años." 
+        });
+      }
+
+      let stripeAccountId = tutorToApprove.stripeAccountId;
+
+      // Create Stripe Connect account if Stripe is configured and account doesn't exist
+      if (!stripe) {
+        return res.status(503).json({ 
+          error: "Stripe no está configurado. No se pueden procesar pagos en este momento." 
+        });
+      }
+
+      if (!stripeAccountId) {
+        try {
+          // Split name into first and last name
+          const nameParts = tutorToApprove.nombre.trim().split(/\s+/);
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(' ') || nameParts[0]; // Use first name if no last name
+
+          // Extract date components
+          const dob = new Date(tutorToApprove.fechaNacimiento);
+          const dobDay = dob.getDate();
+          const dobMonth = dob.getMonth() + 1; // JavaScript months are 0-indexed
+          const dobYear = dob.getFullYear();
+
+          // Get client IP for TOS acceptance
+          const clientIp = req.ip || req.headers['x-forwarded-for'] as string || '127.0.0.1';
+
+          console.log(`Creating Stripe Connect account for tutor ${id} (${tutorToApprove.email})`);
+
+          // Create Custom connected account
+          const account = await stripe.accounts.create({
+            type: 'custom',
+            country: 'MX',
+            email: tutorToApprove.email,
+            capabilities: {
+              card_payments: { requested: true },
+              transfers: { requested: true },
+            },
+            business_type: 'individual',
+            business_profile: {
+              mcc: '8299', // Educational services
+              product_description: 'Servicios de tutoría académica',
+            },
+            individual: {
+              email: tutorToApprove.email,
+              first_name: firstName,
+              last_name: lastName,
+              dob: {
+                day: dobDay,
+                month: dobMonth,
+                year: dobYear,
+              },
+              address: {
+                line1: tutorToApprove.direccion,
+                city: tutorToApprove.ciudad,
+                state: tutorToApprove.estado,
+                postal_code: tutorToApprove.codigoPostal,
+                country: 'MX',
+              },
+              id_number: tutorToApprove.rfc, // RFC serves as tax ID for individuals in Mexico
+            },
+            tos_acceptance: {
+              date: Math.floor(Date.now() / 1000),
+              ip: clientIp,
+            },
+            metadata: {
+              tutorId: id,
+              nombre: tutorToApprove.nombre,
+              rfc: tutorToApprove.rfc,
+            },
+          });
+
+          stripeAccountId = account.id;
+          console.log(`Created Stripe account: ${stripeAccountId}`);
+
+          // Add external bank account using CLABE
+          // For Mexico, CLABE is used as both routing_number and account_number
+          await stripe.accounts.createExternalAccount(stripeAccountId, {
+            external_account: {
+              object: 'bank_account',
+              country: 'MX',
+              currency: 'mxn',
+              routing_number: tutorToApprove.clabe, // 18-digit CLABE
+              account_number: tutorToApprove.clabe, // Same 18-digit CLABE
+              account_holder_name: tutorToApprove.nombre,
+              account_holder_type: 'individual',
+            },
+          });
+
+          console.log(`Added bank account (CLABE ending in ${tutorToApprove.clabe.slice(-4)}) to Stripe account ${stripeAccountId}`);
+
+          // Update tutor with Stripe account ID
+          await storage.updateTutorStripeAccount(id, stripeAccountId);
+          console.log(`Updated tutor ${id} with Stripe account ID`);
+
+        } catch (stripeError: any) {
+          console.error("Error creating Stripe Connect account:", stripeError);
+          // Don't approve tutor if Stripe account creation fails
+          return res.status(500).json({ 
+            error: `Error al crear cuenta de Stripe: ${stripeError.message || 'Error desconocido'}. El tutor no ha sido aprobado.` 
+          });
+        }
+      }
+
+      // Approve the tutor
       const tutor = await storage.updateTutorStatus(id, "aprobado");
       
-      console.log(`Tutor ${id} approved with banking info: CLABE ending in ${tutorToApprove.clabe.slice(-4)}`);
+      console.log(`Tutor ${id} approved successfully with Stripe account ${stripeAccountId || 'N/A'}`);
       
       res.json(tutor);
     } catch (error) {
