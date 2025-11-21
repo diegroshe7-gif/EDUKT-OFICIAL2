@@ -70,6 +70,11 @@ Preferred communication style: Simple, everyday language.
 - `reviews` table: Student ratings and feedback for tutors
   - Fields: tutorId, alumnoId, calificacion (0-5), comentario
   - Allows students to rate completed sessions
+- `availability_slots` table: Tutor recurring availability schedule (November 2025)
+  - Fields: id, tutorId (FK to tutors), dayOfWeek (0-6 for Sunday-Saturday), startTime (minutes from midnight), endTime (minutes from midnight), active (boolean)
+  - Stores recurring weekly time slots when tutors are available
+  - Example: dayOfWeek=1, startTime=840, endTime=960 means "Every Monday from 14:00 to 16:00"
+  - Used with `isAvailable` toggle on tutors table to control booking permissions
 - `users` table: Simple authentication structure with username and password (currently unused)
 
 **API Structure**
@@ -94,6 +99,12 @@ Preferred communication style: Simple, everyday language.
 - Review endpoints:
   - POST `/api/reviews` - Create new review
   - GET `/api/reviews/tutor/:tutorId` - Get all reviews for a tutor
+- Availability endpoints (November 2025):
+  - GET `/api/tutors/:id/availability` - Get all availability slots for a tutor
+  - POST `/api/tutors/:id/availability` - Create new availability slot (body: {dayOfWeek, startTime, endTime})
+  - DELETE `/api/availability-slots/:id` - Delete an availability slot
+  - PATCH `/api/tutors/:id/toggle-availability` - Toggle tutor's availability status (body: {isAvailable})
+  - POST `/api/book-session` - Calculate next occurrence date for booking (body: {slotId, alumnoId, tutorId, horas})
 - Payment endpoints:
   - POST `/api/create-payment-intent` - Initialize payment flow
     - Validates alumno and tutor existence and status
@@ -168,11 +179,19 @@ Preferred communication style: Simple, everyday language.
 - ✅ Stripe payment processing with 8% service fee
 - ✅ Automatic session creation after successful payment
 - ✅ Enhanced tutor profiles with university and optional photo
+- ✅ **Tutor availability system (November 2025):**
+  - Tutors create recurring time slots (day of week + time range)
+  - Toggle availability status (on/off) to control bookings
+  - Students view tutor profiles with available time slots
+  - Intelligent date calculation: booking "Monday" from Tuesday schedules next Monday
+  - Complete CRUD for availability slots with validation
+  - Time slots stored as minutes from midnight for precision
+- ✅ Teacher calendar view showing scheduled sessions
+- ✅ Post-class rating system (0-5 stars) with comments
+- ✅ Display of ratings/reviews on tutor profiles
 - 🔄 Google Calendar integration (connector available, not yet configured)
 - 🔄 Zoom integration for automated meeting links (no native connector available)
-- ⏳ Teacher calendar view showing scheduled sessions
-- ⏳ Post-class rating system (0-5 stars) with comments
-- ⏳ Display of ratings/reviews on tutor profiles
+- ⏳ Complete booking flow integration (TutorProfile → Stripe Checkout → Session creation)
 
 **Security Implementation & Limitations**
 
