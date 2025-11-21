@@ -20,7 +20,6 @@ export const tutors = pgTable("tutors", {
   universidad: text("universidad"),
   fotoPerfil: text("foto_perfil"),
   stripeAccountId: text("stripe_account_id"),
-  calLink: text("cal_link"),
   clabe: text("clabe").notNull(),
   banco: text("banco").notNull(),
   rfc: text("rfc").notNull(),

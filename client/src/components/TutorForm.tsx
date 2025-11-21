@@ -29,7 +29,6 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     universidad: "",
     fotoPerfil: "",
     stripe_account_id: "",
-    cal_link: "",
     clabe: "",
     banco: "",
     rfc: "",
