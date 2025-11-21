@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Calendar, Clock, Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Plus, Trash2, ToggleLeft, ToggleRight, DollarSign } from "lucide-react";
 import TeacherCalendar from "@/pages/teacher-calendar";
+import TutorIncome from "./TutorIncome";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +41,7 @@ function timeToMinutes(time: string): number {
 
 export default function TutorPortal({ onBack }: TutorPortalProps) {
   const { toast } = useToast();
-  const [view, setView] = useState<'availability' | 'calendar'>('availability');
+  const [view, setView] = useState<'availability' | 'calendar' | 'income'>('availability');
   const [tutor, setTutor] = useState<any>(null);
   const [tutorId, setTutorId] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -184,6 +185,10 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
     return <TeacherCalendar tutorId={tutorId} onBack={() => setView('availability')} />;
   }
 
+  if (view === 'income') {
+    return <TutorIncome tutorId={tutorId} onBack={() => setView('availability')} />;
+  }
+
   const sortedSlots = Array.isArray(slots) ? [...slots].sort((a: any, b: any) => {
     if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
     return a.startTime - b.startTime;
@@ -243,6 +248,15 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
               >
                 <Calendar className="h-8 w-8" />
                 <span>Ver Calendario</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-24 flex flex-col gap-2"
+                onClick={() => setView('income')}
+                data-testid="button-view-income"
+              >
+                <DollarSign className="h-8 w-8" />
+                <span>Mis Ingresos</span>
               </Button>
             </div>
           </CardContent>

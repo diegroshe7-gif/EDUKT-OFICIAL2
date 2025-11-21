@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CheckCircle, XCircle, Users, Clock, FileText, ExternalLink } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Users, Clock, FileText, ExternalLink, TrendingUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatusBadge from "./StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import AdminReports from "./AdminReports";
 
 interface AdminPanelProps {
   pending: any[];
@@ -16,6 +18,11 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ pending, approved, rejected, onApprove, onReject, onBack }: AdminPanelProps) {
+  const [showReports, setShowReports] = useState(false);
+
+  if (showReports) {
+    return <AdminReports onBack={() => setShowReports(false)} />;
+  }
   const stats = [
     { label: 'Pendientes', value: pending.length, icon: Clock, color: 'text-yellow-600' },
     { label: 'Aprobados', value: approved.length, icon: CheckCircle, color: 'text-green-600' },
@@ -145,7 +152,15 @@ export default function AdminPanel({ pending, approved, rejected, onApprove, onR
             <h1 className="text-2xl font-bold" style={{ fontFamily: 'Sora, sans-serif' }}>
               Panel de Administración
             </h1>
-            <div className="w-[100px]" />
+            <Button
+              variant="outline"
+              onClick={() => setShowReports(true)}
+              className="gap-2"
+              data-testid="button-view-reports"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Ver Reportes
+            </Button>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
