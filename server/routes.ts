@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReviewSchema } from "@shared/schema";
+import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReviewSchema, insertAvailabilitySlotSchema } from "@shared/schema";
 import { z } from "zod";
 import Stripe from "stripe";
 import crypto from "crypto";
@@ -532,6 +532,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching tutor rating:", error);
       res.status(500).json({ error: "Failed to fetch rating" });
+    }
+  });
+
+  // Availability Slot routes
+  app.get("/api/tutors/:id/availability", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const slots = await storage.getAvailabilitySlotsByTutor(id);
+      res.json(slots);
+    } catch (error) {
+      console.error("Error fetching availability slots:", error);
+      res.status(500).json({ error: "Failed to fetch availability slots" });
+    }
+  });
+
+  app.post("/api/tutors/:id/availability", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertAvailabilitySlotSchema.parse({
+        ...req.body,
+        tutorId: id
+      });
+      
+      // Validate slot times
+      if (validatedData.endTime <= validatedData.startTime) {
+        return res.status(400).json({ error: "La hora de fin debe ser posterior a la hora de inicio" });
+      }
+      
+      const slot = await storage.createAvailabilitySlot(validatedData);
+      res.json(slot);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid slot data", details: error.errors });
+      } else {
+        console.error("Error creating availability slot:", error);
+        res.status(500).json({ error: "Failed to create availability slot" });
+      }
+    }
+  });
+
+  app.delete("/api/availability-slots/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteAvailabilitySlot(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting availability slot:", error);
+      res.status(500).json({ error: "Failed to delete availability slot" });
+    }
+  });
+
+  app.patch("/api/tutors/:id/toggle-availability", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isAvailable } = req.body;
+      
+      if (typeof isAvailable !== 'boolean') {
+        return res.status(400).json({ error: "isAvailable must be a boolean" });
+      }
+      
+      const tutor = await storage.updateTutorAvailability(id, isAvailable);
+      if (!tutor) {
+        return res.status(404).json({ error: "Tutor not found" });
+      }
+      
+      res.json(tutor);
+    } catch (error) {
+      console.error("Error toggling tutor availability:", error);
+      res.status(500).json({ error: "Failed to toggle availability" });
+    }
+  });
+
+  // Helper function to calculate next occurrence of a weekday
+  function calculateNextOccurrence(dayOfWeek: number, startTimeMinutes: number, durationHours: number): { startTime: Date; endTime: Date } {
+    const now = new Date();
+    const currentDay = now.getDay();
+    
+    let daysUntilTarget = dayOfWeek - currentDay;
+    if (daysUntilTarget <= 0) {
+      daysUntilTarget += 7;
+    }
+    
+    const targetDate = new Date(now);
+    targetDate.setDate(now.getDate() + daysUntilTarget);
+    
+    const hours = Math.floor(startTimeMinutes / 60);
+    const minutes = startTimeMinutes % 60;
+    targetDate.setHours(hours, minutes, 0, 0);
+    
+    const startTime = targetDate;
+    const endTime = new Date(startTime.getTime() + durationHours * 60 * 60 * 1000);
+    
+    return { startTime, endTime };
+  }
+
+  // Booking route with smart date calculation
+  app.post("/api/book-session", async (req, res) => {
+    try {
+      const { slotId, alumnoId, tutorId, horas } = req.body;
+      
+      if (!slotId || !alumnoId || !tutorId || !horas) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      // Verify alumno exists
+      const alumno = await storage.getAlumnoById(alumnoId);
+      if (!alumno) {
+        return res.status(404).json({ error: "Alumno not found" });
+      }
+      
+      // Verify tutor exists and is approved and available
+      const tutor = await storage.getTutorById(tutorId);
+      if (!tutor) {
+        return res.status(404).json({ error: "Tutor not found" });
+      }
+      if (tutor.status !== "aprobado") {
+        return res.status(400).json({ error: "Tutor not approved" });
+      }
+      if (!tutor.isAvailable) {
+        return res.status(400).json({ error: "Tutor is not currently available" });
+      }
+      
+      // Get availability slot
+      const slots = await storage.getAvailabilitySlotsByTutor(tutorId);
+      const slot = slots.find(s => s.id === slotId);
+      if (!slot) {
+        return res.status(404).json({ error: "Availability slot not found" });
+      }
+      
+      // Calculate next occurrence of this day
+      const { startTime, endTime } = calculateNextOccurrence(slot.dayOfWeek, slot.startTime, horas);
+      
+      res.json({
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        slot: {
+          dayOfWeek: slot.dayOfWeek,
+          startTime: slot.startTime,
+          endTime: slot.endTime
+        }
+      });
+    } catch (error) {
+      console.error("Error booking session:", error);
+      res.status(500).json({ error: "Failed to book session" });
     }
   });
 
