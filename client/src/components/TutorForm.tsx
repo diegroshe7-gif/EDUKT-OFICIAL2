@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, FileText, Calendar, DollarSign, MapPin } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Calendar, DollarSign, MapPin, CreditCard } from "lucide-react";
 
 interface TutorFormProps {
   onSubmit: (data: any) => void;
@@ -30,6 +30,9 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     fotoPerfil: "",
     stripe_account_id: "",
     cal_link: "",
+    clabe: "",
+    banco: "",
+    rfc: "",
   });
 
   const handleChange = (field: string, value: string) => {
@@ -260,6 +263,63 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                     onChange={(e) => handleChange("disponibilidad", e.target.value)}
                     required
                     data-testid="input-disponibilidad"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Información Bancaria
+              </CardTitle>
+              <CardDescription>
+                Datos necesarios para transferir tus ganancias (92% de cada clase)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="clabe">CLABE Interbancaria *</Label>
+                <Input
+                  id="clabe"
+                  placeholder="123456789012345678 (18 dígitos)"
+                  value={formData.clabe}
+                  onChange={(e) => handleChange("clabe", e.target.value)}
+                  maxLength={18}
+                  pattern="\d{18}"
+                  required
+                  data-testid="input-clabe"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Puedes encontrar tu CLABE en tu app de banco o estado de cuenta
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="banco">Banco *</Label>
+                  <Input
+                    id="banco"
+                    placeholder="Ej: BBVA, Santander, Banorte"
+                    value={formData.banco}
+                    onChange={(e) => handleChange("banco", e.target.value)}
+                    required
+                    data-testid="input-banco"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rfc">RFC *</Label>
+                  <Input
+                    id="rfc"
+                    placeholder="ABCD123456XYZ (12 o 13 caracteres)"
+                    value={formData.rfc}
+                    onChange={(e) => handleChange("rfc", e.target.value.toUpperCase())}
+                    maxLength={13}
+                    pattern="[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}"
+                    required
+                    data-testid="input-rfc"
                   />
                 </div>
               </div>
