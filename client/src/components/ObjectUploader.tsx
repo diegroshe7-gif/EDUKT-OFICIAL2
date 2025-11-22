@@ -25,12 +25,18 @@ interface ObjectUploaderProps {
   children: ReactNode;
 }
 
-function DropzoneContent({ children }: { children: ReactNode }) {
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    noClick: false,
-  });
-  const files = useUppyState((state) => state.files);
-  const totalProgress = useUppyState((state) => state.totalProgress);
+interface DropzoneContentProps {
+  uppy: Uppy;
+  children: ReactNode;
+  buttonClassName?: string;
+}
+
+function DropzoneContent({ uppy, children, buttonClassName }: DropzoneContentProps) {
+  const { getRootProps, getInputProps } = useDropzone({ noClick: false });
+  const [isDragActive, setIsDragActive] = useState(false);
+  
+  const files = useUppyState(uppy, (state) => state.files);
+  const totalProgress = useUppyState(uppy, (state) => state.totalProgress);
   const isUploading = Object.keys(files).some((fileId) => files[fileId].progress?.uploadStarted);
   const hasCompleted = Object.keys(files).some((fileId) => files[fileId].progress?.uploadComplete);
 
@@ -40,7 +46,11 @@ function DropzoneContent({ children }: { children: ReactNode }) {
       className={cn(
         "relative cursor-pointer rounded-md border-2 border-dashed transition-colors",
         isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
+        buttonClassName
       )}
+      onDragEnter={() => setIsDragActive(true)}
+      onDragLeave={() => setIsDragActive(false)}
+      onDrop={() => setIsDragActive(false)}
       data-testid="dropzone-upload"
     >
       <input {...getInputProps()} data-testid="input-file-upload" />
@@ -143,10 +153,10 @@ export function ObjectUploader({
   );
 
   return (
-    <div className={buttonClassName}>
-      <UppyContextProvider uppy={uppy}>
-        <DropzoneContent>{children}</DropzoneContent>
-      </UppyContextProvider>
-    </div>
+    <UppyContextProvider uppy={uppy}>
+      <DropzoneContent uppy={uppy} buttonClassName={buttonClassName}>
+        {children}
+      </DropzoneContent>
+    </UppyContextProvider>
   );
 }
