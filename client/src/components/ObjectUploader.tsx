@@ -1,13 +1,8 @@
-// Referenced from blueprint:javascript_object_storage integration
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
-import Uppy from "@uppy/core";
-import AwsS3 from "@uppy/aws-s3";
-import type { UploadResult } from "@uppy/core";
-import { useUppyState, UppyContextProvider, useDropzone } from "@uppy/react";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, CheckCircle2, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
@@ -17,88 +12,18 @@ interface ObjectUploaderProps {
     method: "PUT";
     url: string;
   }>;
-  onComplete?: (
-    result: UploadResult<Record<string, unknown>, Record<string, unknown>>
-  ) => void;
+  onComplete?: (objectPath: string) => void;
   buttonClassName?: string;
-  buttonVariant?: "default" | "outline" | "ghost" | "secondary";
   children: ReactNode;
-}
-
-interface DropzoneContentProps {
-  uppy: Uppy;
-  children: ReactNode;
-  buttonClassName?: string;
-}
-
-function DropzoneContent({ uppy, children, buttonClassName }: DropzoneContentProps) {
-  const { getRootProps, getInputProps } = useDropzone({ noClick: false });
-  const [isDragActive, setIsDragActive] = useState(false);
-  
-  const files = useUppyState(uppy, (state) => state.files);
-  const totalProgress = useUppyState(uppy, (state) => state.totalProgress);
-  const isUploading = Object.keys(files).some((fileId) => files[fileId].progress?.uploadStarted);
-  const hasCompleted = Object.keys(files).some((fileId) => files[fileId].progress?.uploadComplete);
-
-  return (
-    <div
-      {...getRootProps()}
-      className={cn(
-        "relative cursor-pointer rounded-md border-2 border-dashed transition-colors",
-        isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50",
-        buttonClassName
-      )}
-      onDragEnter={() => setIsDragActive(true)}
-      onDragLeave={() => setIsDragActive(false)}
-      onDrop={() => setIsDragActive(false)}
-      data-testid="dropzone-upload"
-    >
-      <input {...getInputProps()} data-testid="input-file-upload" />
-      <div className="p-6 text-center">
-        <div className="flex flex-col items-center gap-2">
-          {isUploading ? (
-            <>
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Uploading... {totalProgress}%
-              </p>
-            </>
-          ) : hasCompleted ? (
-            <>
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
-              <p className="text-sm text-muted-foreground">
-                Upload complete!
-              </p>
-            </>
-          ) : (
-            <>
-              <Upload className="h-8 w-8 text-muted-foreground" />
-              {children || (
-                <div>
-                  <p className="text-sm font-medium">
-                    Drag & drop or click to upload
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Drop files here or click to browse
-                  </p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 /**
- * File upload component using Uppy with drag & drop interface.
+ * Simple file upload component with direct file input.
  * 
  * Features:
- * - Accessible drag & drop using Uppy's useDropzone hook
- * - Click-to-upload fallback with keyboard support
- * - File type and size validation via Uppy
- * - Direct upload to presigned URLs using AwsS3 plugin
+ * - Click to select files
+ * - File type and size validation
+ * - Direct upload to presigned URLs
  * - Progress feedback and status indicators
  */
 export function ObjectUploader({
@@ -108,55 +33,154 @@ export function ObjectUploader({
   onGetUploadParameters,
   onComplete,
   buttonClassName,
-  buttonVariant = "outline",
   children,
 }: ObjectUploaderProps) {
   const { toast } = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [hasCompleted, setHasCompleted] = useState(false);
 
-  const [uppy] = useState(() =>
-    new Uppy({
-      restrictions: {
-        maxNumberOfFiles,
-        maxFileSize,
-        allowedFileTypes,
-      },
-      autoProceed: true,
-    })
-      .use(AwsS3, {
-        shouldUseMultipart: false,
-        getUploadParameters: onGetUploadParameters,
-      })
-      .on("upload-success", () => {
-        toast({
-          title: "Upload successful",
-          description: "Your file has been uploaded successfully.",
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (allowedFileTypes && !allowedFileTypes.some(type => {
+      if (type.endsWith('/*')) {
+        return file.type.startsWith(type.slice(0, -2));
+      }
+      return file.type === type || file.name.endsWith(type);
+    })) {
+      toast({
+        title: "File type not allowed",
+        description: `Please upload a file matching: ${allowedFileTypes.join(', ')}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size
+    if (file.size > maxFileSize) {
+      toast({
+        title: "File too large",
+        description: `Maximum file size is ${Math.round(maxFileSize / 1024 / 1024)}MB`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setProgress(0);
+      setHasCompleted(false);
+
+      // Get presigned URL
+      const params = await onGetUploadParameters();
+      
+      // Upload file
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = Math.round((e.loaded / e.total) * 100);
+          setProgress(percentComplete);
+        }
+      });
+
+      await new Promise((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(null);
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
         });
-      })
-      .on("complete", (result) => {
-        onComplete?.(result);
-      })
-      .on("upload-error", (file, error) => {
-        console.error("Upload error:", error);
-        toast({
-          title: "Upload failed",
-          description: error.message || "Failed to upload file. Please try again.",
-          variant: "destructive",
-        });
-      })
-      .on("restriction-failed", (file, error) => {
-        toast({
-          title: "File not allowed",
-          description: error.message,
-          variant: "destructive",
-        });
-      })
-  );
+        xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+
+        xhr.open(params.method, params.url);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.send(file);
+      });
+
+      setIsUploading(false);
+      setHasCompleted(true);
+      setProgress(100);
+
+      toast({
+        title: "Upload successful",
+        description: "Your file has been uploaded successfully.",
+      });
+
+      // Reset form
+      if (inputRef.current) {
+        inputRef.current.value = '';
+      }
+
+      // Notify parent component (objectPath is constructed from file path structure)
+      onComplete?.(`uploads/${file.name}`);
+    } catch (error) {
+      setIsUploading(false);
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to upload file. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
-    <UppyContextProvider uppy={uppy}>
-      <DropzoneContent uppy={uppy} buttonClassName={buttonClassName}>
-        {children}
-      </DropzoneContent>
-    </UppyContextProvider>
+    <div className={buttonClassName}>
+      <input
+        ref={inputRef}
+        type="file"
+        onChange={handleFileSelect}
+        disabled={isUploading}
+        accept={allowedFileTypes?.join(',')}
+        style={{ display: 'none' }}
+        data-testid="input-file-upload"
+      />
+
+      <div className="flex flex-col items-center gap-3 p-6 rounded-md border-2 border-dashed border-border">
+        {isUploading ? (
+          <>
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">
+              Uploading... {progress}%
+            </p>
+          </>
+        ) : hasCompleted ? (
+          <>
+            <CheckCircle2 className="h-8 w-8 text-green-600" />
+            <p className="text-sm text-muted-foreground">
+              Upload complete!
+            </p>
+          </>
+        ) : (
+          <>
+            <Upload className="h-8 w-8 text-muted-foreground" />
+            {children || (
+              <div className="text-center">
+                <p className="text-sm font-medium">
+                  Click to upload file
+                </p>
+              </div>
+            )}
+            <Button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={isUploading}
+              variant="outline"
+              size="sm"
+              data-testid="button-select-file"
+            >
+              Select File
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
