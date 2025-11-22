@@ -5,13 +5,12 @@ import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReview
 import { z } from "zod";
 import Stripe from "stripe";
 import crypto from "crypto";
-import { createTutoringSession } from "./google-calendar";
+import { createTutoringSession, sendPasswordResetEmail } from "./google-calendar";
 import { hashPassword, verifyPassword, verifyAdminCredentials } from "./auth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { db } from "./db";
 import { resetTokens } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import https from "https";
 
 // Use test key in development, production key otherwise
 const stripeKey = process.env.NODE_ENV === 'development' 
@@ -511,79 +510,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt,
       });
 
-      // Send email with reset token using Resend API
-      const resendApiKey = process.env.RESEND_API_KEY;
-      const ownerEmail = process.env.OWNER_EMAIL || 'notificationsedukt@gmail.com';
-      
-      if (resendApiKey) {
-        try {
-          const resetLink = `${process.env.VITE_API_BASE_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}&type=${userType}`;
-          
-          // In testing mode, Resend only allows sending to the owner's email
-          // For other emails, we'll need to verify a domain first
-          const canSendEmail = email.toLowerCase() === ownerEmail.toLowerCase();
-          
-          if (!canSendEmail) {
-            console.warn(`Cannot send to ${email} in testing mode. Resend requires domain verification for non-owner emails.`);
-            return res.status(403).json({ 
-              error: "Email enviado solo funciona para el email del administrador. Para usar con otros emails, verifica un dominio en resend.com/domains",
-              requiresDomainVerification: true 
-            });
-          }
-          
-          const payload = JSON.stringify({
-            from: 'onboarding@resend.dev',
-            to: email,
-            subject: 'Restablecer tu contraseña en EDUKT',
-            html: `
-              <h2>Restablecer contraseña</h2>
-              <p>Recibimos una solicitud para restablecer tu contraseña.</p>
-              <p>Haz clic en el siguiente enlace para crear una nueva contraseña:</p>
-              <p><a href="${resetLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Restablecer Contraseña</a></p>
-              <p>Este enlace expira en 1 hora.</p>
-              <p>Si no solicitaste restablecer tu contraseña, ignora este email.</p>
-            `,
-          });
-
-          const result = await new Promise<{success: boolean; error?: string}>((resolve) => {
-            const req = https.request('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${resendApiKey}`,
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(payload),
-              },
-            }, (res) => {
-              let data = '';
-              res.on('data', (chunk) => { data += chunk; });
-              res.on('end', () => {
-                if (res.statusCode === 200 || res.statusCode === 201) {
-                  console.log(`Reset email sent to ${email}`);
-                  resolve({ success: true });
-                } else {
-                  console.error('Resend error:', data);
-                  resolve({ success: false, error: data });
-                }
-              });
-            });
-            
-            req.on('error', (err) => {
-              console.error('Request error:', err);
-              resolve({ success: false, error: err.message });
-            });
-            req.write(payload);
-            req.end();
-          });
-
-          if (!result.success) {
-            throw new Error(result.error || 'Email send failed');
-          }
-        } catch (emailError) {
-          console.error('Error sending reset email:', emailError);
-          throw emailError;
+      // Send email with reset token using Gmail API
+      try {
+        const emailSent = await sendPasswordResetEmail(email, resetToken, userType);
+        if (!emailSent) {
+          throw new Error('Failed to send email');
         }
-      } else {
-        throw new Error('RESEND_API_KEY not configured');
+      } catch (emailError) {
+        console.error('Error sending reset email:', emailError);
+        return res.status(500).json({ 
+          error: "No se pudo enviar el email. Intenta nuevamente más tarde." 
+        });
       }
       
       res.json({ success: true });
