@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CheckCircle, XCircle, Users, Clock, FileText, ExternalLink, TrendingUp } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Users, Clock, FileText, ExternalLink, TrendingUp, Eye } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatusBadge from "./StatusBadge";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AdminReports from "./AdminReports";
+import TutorDetailModal from "./TutorDetailModal";
 
 interface AdminPanelProps {
   pending: any[];
@@ -19,6 +20,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ pending, approved, rejected, onApprove, onReject, onBack }: AdminPanelProps) {
   const [showReports, setShowReports] = useState(false);
+  const [selectedTutor, setSelectedTutor] = useState<any | null>(null);
 
   if (showReports) {
     return <AdminReports onBack={() => setShowReports(false)} />;
@@ -39,6 +41,12 @@ export default function AdminPanel({ pending, approved, rejected, onApprove, onR
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4 flex-1 min-w-0">
               <Avatar className="h-12 w-12">
+                {tutor.fotoPerfil && (
+                  <AvatarImage 
+                    src={`/objects/${tutor.fotoPerfil}`} 
+                    alt={tutor.nombre}
+                  />
+                )}
                 <AvatarFallback className="bg-primary text-primary-foreground">
                   {initials}
                 </AvatarFallback>
@@ -94,19 +102,31 @@ export default function AdminPanel({ pending, approved, rejected, onApprove, onR
             <p className="text-sm">{tutor.disponibilidad}</p>
           </div>
 
-          {tutor.cvUrl && (
+          <div className="flex gap-2 flex-wrap">
             <Button 
               variant="outline" 
               size="sm" 
               className="gap-2"
-              onClick={() => window.open(tutor.cvUrl, '_blank')}
-              data-testid={`button-view-cv-${index}`}
+              onClick={() => setSelectedTutor(tutor)}
+              data-testid={`button-view-details-${index}`}
             >
-              <FileText className="h-4 w-4" />
-              Ver CV
-              <ExternalLink className="h-3 w-3" />
+              <Eye className="h-4 w-4" />
+              Ver Completo
             </Button>
-          )}
+            {tutor.cvUrl && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2"
+                onClick={() => window.open(`/objects/${tutor.cvUrl}`, '_blank')}
+                data-testid={`button-view-cv-${index}`}
+              >
+                <FileText className="h-4 w-4" />
+                Ver CV
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
 
           {isPending && (
             <div className="flex gap-2 pt-4 border-t">
@@ -250,6 +270,26 @@ export default function AdminPanel({ pending, approved, rejected, onApprove, onR
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Tutor Detail Modal */}
+      <TutorDetailModal 
+        tutor={selectedTutor}
+        onClose={() => setSelectedTutor(null)}
+        onApprove={(id) => {
+          const index = pending.findIndex((t: any) => t.id === id);
+          if (index !== -1) {
+            onApprove(index);
+            setSelectedTutor(null);
+          }
+        }}
+        onReject={(id) => {
+          const index = pending.findIndex((t: any) => t.id === id);
+          if (index !== -1) {
+            onReject(index);
+            setSelectedTutor(null);
+          }
+        }}
+      />
     </div>
   );
 }
