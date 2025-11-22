@@ -513,7 +513,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // TODO: Send email with reset link
       console.log(`Reset token for ${email}: ${resetToken}`);
       
-      res.json({ success: true });
+      // In development, return the token for testing
+      // In production, this should be sent via email
+      res.json({ 
+        success: true,
+        ...(process.env.NODE_ENV === 'development' && { token: resetToken })
+      });
     } catch (error) {
       console.error("Error requesting reset:", error);
       res.status(500).json({ error: "Failed to request reset" });
