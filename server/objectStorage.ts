@@ -145,7 +145,8 @@ export class ObjectStorageService {
     // Use the first public search path for uploads
     const publicDir = publicObjectSearchPaths[0];
     const objectId = randomUUID();
-    const fullPath = `${publicDir}/uploads/${objectId}`;
+    const relativePath = `uploads/${objectId}`;
+    const fullPath = `${publicDir}/${relativePath}`;
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
@@ -158,8 +159,9 @@ export class ObjectStorageService {
     });
 
     // Return both the upload URL and the final object path
-    // Files uploaded to the public directory are accessible without authentication
-    const objectPath = `/objects/uploads/${objectId}`;
+    // The objectPath uses the relative path that searchPublicObject will find
+    // Convention: files in public directories are accessible without authentication
+    const objectPath = `/objects/${relativePath}`;
     return { uploadURL, objectPath };
   }
 

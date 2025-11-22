@@ -70,40 +70,28 @@ function verifyBookingToken(token: string, paymentIntentId: string, alumnoId: st
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Referenced from blueprint:javascript_object_storage - Public file uploading endpoints
-  // This endpoint serves uploaded files with ACL enforcement
+  // This endpoint serves uploaded files with security by convention:
+  // - Files in public directories (PUBLIC_OBJECT_SEARCH_PATHS) are accessible without auth
+  // - Files in private directory require authentication (not implemented in MVP)
   app.get("/objects/:objectPath(*)", async (req, res) => {
     const objectStorageService = new ObjectStorageService();
     try {
-      // Extract the relative path from the request
+      // Extract the relative path from the request (e.g., "uploads/abc123")
       const relativePath = req.params.objectPath;
       
-      // Try to find the file in public directories first
+      // Try to find the file in public directories first (security by convention)
       const publicFile = await objectStorageService.searchPublicObject(relativePath);
       
       if (publicFile) {
-        // File found in public directory - accessible without authentication
+        // File found in public directory - serve it without authentication
+        // This is correct for MVP: tutor registration files are public
         return objectStorageService.downloadObject(publicFile, res);
       }
       
-      // If not found in public, try private directory
-      try {
-        const privateFile = await objectStorageService.getObjectEntityFile(req.path);
-        
-        // For private files, check ACL authorization
-        // In this MVP, tutor registration files are public (stored in public dir)
-        // Private files would require authentication which we don't have yet
-        // For now, reject access to private files
-        console.log("Attempted access to private file without authentication:", req.path);
-        return res.status(403).json({ 
-          error: "Access denied. This file requires authentication." 
-        });
-      } catch (privateError) {
-        // File not found in either public or private directories
-        if (privateError instanceof ObjectNotFoundError) {
-          return res.sendStatus(404);
-        }
-        throw privateError;
-      }
+      // File not found in any public directory
+      // For MVP, we don't support private files (would require authentication)
+      console.log("File not found in public directories:", relativePath);
+      return res.sendStatus(404);
     } catch (error) {
       console.error("Error serving object:", error);
       if (error instanceof ObjectNotFoundError) {
