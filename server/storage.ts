@@ -28,11 +28,13 @@ export interface IStorage {
   updateTutorStatus(id: string, status: string): Promise<Tutor | undefined>;
   updateTutorAvailability(id: string, isAvailable: boolean): Promise<Tutor | undefined>;
   updateTutorStripeAccount(id: string, stripeAccountId: string): Promise<Tutor | undefined>;
+  updateTutorPasswordByEmail(email: string, hashedPassword: string): Promise<Tutor | undefined>;
   getAllApprovedTutors(): Promise<Tutor[]>;
   
   createAlumno(alumno: InsertAlumno): Promise<Alumno>;
   getAlumnoById(id: string): Promise<Alumno | undefined>;
   getAlumnoByEmail(email: string): Promise<Alumno | undefined>;
+  updateAlumnoPasswordByEmail(email: string, hashedPassword: string): Promise<Alumno | undefined>;
   getAllAlumnos(): Promise<Alumno[]>;
   
   createSesion(sesion: InsertSesion): Promise<Sesion>;
@@ -114,6 +116,14 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async updateTutorPasswordByEmail(email: string, hashedPassword: string): Promise<Tutor | undefined> {
+    const result = await db.update(tutors)
+      .set({ password: hashedPassword })
+      .where(eq(tutors.email, email))
+      .returning();
+    return result[0];
+  }
+
   async getAllApprovedTutors(): Promise<Tutor[]> {
     return await db.select().from(tutors).where(eq(tutors.status, "aprobado"));
   }
@@ -130,6 +140,14 @@ export class DbStorage implements IStorage {
 
   async getAlumnoByEmail(email: string): Promise<Alumno | undefined> {
     const result = await db.select().from(alumnos).where(eq(alumnos.email, email)).limit(1);
+    return result[0];
+  }
+
+  async updateAlumnoPasswordByEmail(email: string, hashedPassword: string): Promise<Alumno | undefined> {
+    const result = await db.update(alumnos)
+      .set({ password: hashedPassword })
+      .where(eq(alumnos.email, email))
+      .returning();
     return result[0];
   }
 

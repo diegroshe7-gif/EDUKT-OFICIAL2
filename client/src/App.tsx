@@ -15,10 +15,11 @@ import AdminLogin from "@/components/AdminLogin";
 import StudentPortal from "@/components/StudentPortal";
 import AdminPanel from "@/components/AdminPanel";
 import TutorPortal from "@/components/TutorPortal";
+import PasswordReset from "@/components/PasswordReset";
 
 function Router() {
   const { toast } = useToast();
-  const [view, setView] = useState<'landing' | 'tutor-registro' | 'tutor-login' | 'tutor-portal' | 'alumno-registro' | 'alumno-login' | 'alumno' | 'admin-login' | 'admin' | null>('landing');
+  const [view, setView] = useState<'landing' | 'tutor-registro' | 'tutor-login' | 'tutor-portal' | 'alumno-registro' | 'alumno-login' | 'alumno' | 'admin-login' | 'admin' | 'tutor-reset' | 'alumno-reset' | null>('landing');
   const [alumnoRegistrado, setAlumnoRegistrado] = useState<any>(null);
   const [tutorActual, setTutorActual] = useState<any>(null);
 
@@ -219,7 +220,8 @@ function Router() {
         {view === 'landing' && <Landing onSelectRole={handleSelectRole} />}
         
         {view === 'tutor-registro' && <TutorForm onSubmit={submitTutor} onBack={() => setView('landing')} />}
-        {view === 'tutor-login' && <TutorLogin onSuccess={handleTutorLoginSuccess} onBack={() => setView('landing')} />}
+        {view === 'tutor-login' && <TutorLogin onSuccess={handleTutorLoginSuccess} onBack={() => setView('landing')} onForgotPassword={() => setView('tutor-reset')} />}
+        {view === 'tutor-reset' && <PasswordReset userType="tutor" onBack={() => setView('tutor-login')} />}
         {view === 'tutor-portal' && <TutorPortal onBack={() => {
           setView('landing');
           setTutorActual(null);
@@ -232,7 +234,8 @@ function Router() {
             onBack={() => setView('landing')} 
           />
         )}
-        {view === 'alumno-login' && <AlumnoLogin onSuccess={handleAlumnoLoginSuccess} onBack={() => setView('landing')} />}
+        {view === 'alumno-login' && <AlumnoLogin onSuccess={handleAlumnoLoginSuccess} onBack={() => setView('landing')} onForgotPassword={() => setView('alumno-reset')} />}
+        {view === 'alumno-reset' && <PasswordReset userType="alumno" onBack={() => setView('alumno-login')} />}
         {view === 'alumno' && (
           <StudentPortal 
             tutors={approvedTutors} 

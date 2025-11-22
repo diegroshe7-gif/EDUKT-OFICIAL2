@@ -3,15 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, LogIn } from "lucide-react";
+import { ArrowLeft, LogIn, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface AlumnoLoginProps {
   onSuccess: (alumno: any) => void;
   onBack: () => void;
+  onForgotPassword: () => void;
 }
 
-export default function AlumnoLogin({ onSuccess, onBack }: AlumnoLoginProps) {
+export default function AlumnoLogin({ onSuccess, onBack, onForgotPassword }: AlumnoLoginProps) {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -119,11 +120,23 @@ export default function AlumnoLogin({ onSuccess, onBack }: AlumnoLoginProps) {
           <Button 
             type="submit" 
             size="lg" 
-            className="w-full bg-primary hover:bg-primary text-primary-foreground"
+            className="w-full"
             disabled={isLoading}
             data-testid="button-login-submit"
           >
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             {isLoading ? "Iniciando..." : "Iniciar Sesión"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={onForgotPassword}
+            data-testid="button-forgot-password"
+          >
+            ¿Olvidaste tu contraseña?
           </Button>
         </form>
       </div>
