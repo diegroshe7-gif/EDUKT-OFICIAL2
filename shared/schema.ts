@@ -163,3 +163,20 @@ export const insertAvailabilitySlotSchema = createInsertSchema(availabilitySlots
 
 export type InsertAvailabilitySlot = z.infer<typeof insertAvailabilitySlotSchema>;
 export type AvailabilitySlot = typeof availabilitySlots.$inferSelect;
+
+export const resetTokens = pgTable("reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  userType: text("user_type").notNull(), // "tutor" or "alumno"
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertResetTokenSchema = createInsertSchema(resetTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertResetToken = z.infer<typeof insertResetTokenSchema>;
+export type ResetToken = typeof resetTokens.$inferSelect;
