@@ -513,9 +513,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send email with reset token using Resend API
       const resendApiKey = process.env.RESEND_API_KEY;
+      const ownerEmail = process.env.OWNER_EMAIL || 'notificationsedukt@gmail.com';
+      
       if (resendApiKey) {
         try {
           const resetLink = `${process.env.VITE_API_BASE_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}&type=${userType}`;
+          
+          // In testing mode, Resend only allows sending to the owner's email
+          // For other emails, we'll need to verify a domain first
+          const canSendEmail = email.toLowerCase() === ownerEmail.toLowerCase();
+          
+          if (!canSendEmail) {
+            console.warn(`Cannot send to ${email} in testing mode. Resend requires domain verification for non-owner emails.`);
+            return res.status(403).json({ 
+              error: "Email enviado solo funciona para el email del administrador. Para usar con otros emails, verifica un dominio en resend.com/domains",
+              requiresDomainVerification: true 
+            });
+          }
           
           const payload = JSON.stringify({
             from: 'onboarding@resend.dev',
