@@ -5,12 +5,13 @@ import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReview
 import { z } from "zod";
 import Stripe from "stripe";
 import crypto from "crypto";
-import { createTutoringSession, sendPasswordResetEmail } from "./google-calendar";
+import { createTutoringSession } from "./google-calendar";
 import { hashPassword, verifyPassword, verifyAdminCredentials } from "./auth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { db } from "./db";
 import { resetTokens } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import https from "https";
 
 // Use test key in development, production key otherwise
 const stripeKey = process.env.NODE_ENV === 'development' 
@@ -510,25 +511,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt,
       });
 
-      // Send email with reset token using Gmail API
-      let emailSent = false;
-      try {
-        emailSent = await sendPasswordResetEmail(email, resetToken, userType);
-        if (emailSent) {
-          console.log(`Reset email sent to ${email}`);
+      // Send email with reset token using Resend API
+      const resendApiKey = process.env.RESEND_API_KEY;
+      if (resendApiKey) {
+        try {
+          const resetLink = `${process.env.VITE_API_BASE_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}&type=${userType}`;
+          
+          const payload = JSON.stringify({
+            from: 'onboarding@resend.dev',
+            to: email,
+            subject: 'Restablecer tu contraseña en EDUKT',
+            html: `
+              <h2>Restablecer contraseña</h2>
+              <p>Recibimos una solicitud para restablecer tu contraseña.</p>
+              <p>Haz clic en el siguiente enlace para crear una nueva contraseña:</p>
+              <p><a href="${resetLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Restablecer Contraseña</a></p>
+              <p>Este enlace expira en 1 hora.</p>
+              <p>Si no solicitaste restablecer tu contraseña, ignora este email.</p>
+            `,
+          });
+
+          const result = await new Promise<{success: boolean; error?: string}>((resolve) => {
+            const req = https.request('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${resendApiKey}`,
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload),
+              },
+            }, (res) => {
+              let data = '';
+              res.on('data', (chunk) => { data += chunk; });
+              res.on('end', () => {
+                if (res.statusCode === 200 || res.statusCode === 201) {
+                  console.log(`Reset email sent to ${email}`);
+                  resolve({ success: true });
+                } else {
+                  console.error('Resend error:', data);
+                  resolve({ success: false, error: data });
+                }
+              });
+            });
+            
+            req.on('error', (err) => {
+              console.error('Request error:', err);
+              resolve({ success: false, error: err.message });
+            });
+            req.write(payload);
+            req.end();
+          });
+
+          if (!result.success) {
+            throw new Error(result.error || 'Email send failed');
+          }
+        } catch (emailError) {
+          console.error('Error sending reset email:', emailError);
+          throw emailError;
         }
-      } catch (emailError) {
-        console.error('Error sending reset email:', emailError);
+      } else {
+        throw new Error('RESEND_API_KEY not configured');
       }
       
-      // In development, return token if email failed
-      const response: any = { success: true };
-      if (process.env.NODE_ENV === 'development' && !emailSent) {
-        response.devToken = resetToken;
-        console.log(`[DEV] Reset token (no email sent): ${resetToken}`);
-      }
-      
-      res.json(response);
+      res.json({ success: true });
     } catch (error) {
       console.error("Error requesting reset:", error);
       res.status(500).json({ error: "Failed to request reset" });

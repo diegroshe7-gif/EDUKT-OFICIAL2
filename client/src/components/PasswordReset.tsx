@@ -44,22 +44,10 @@ export default function PasswordReset({ userType, onBack }: PasswordResetProps) 
         throw new Error(error.error || "No se pudo enviar el email");
       }
 
-      const data = await response.json();
-      
-      if (data.devToken) {
-        // Development mode: show token directly
-        setToken(data.devToken);
-        toast({
-          title: "Código de reseteo",
-          description: "Usa el código que se muestra abajo para resetear tu contraseña",
-        });
-      } else {
-        toast({
-          title: "Email enviado",
-          description: "Revisa tu email para el enlace de reseteo de contraseña",
-        });
-      }
-      
+      toast({
+        title: "Email enviado",
+        description: "Revisa tu email para el enlace de reseteo de contraseña",
+      });
       setStep("token");
     } catch (error) {
       toast({
@@ -204,17 +192,12 @@ export default function PasswordReset({ userType, onBack }: PasswordResetProps) 
                     <Label htmlFor="token">Código de Reseteo</Label>
                     <Input
                       id="token"
-                      placeholder="Código recibido en tu email"
+                      type="text"
+                      placeholder="Pega el código del email aquí"
                       value={token}
                       onChange={(e) => setToken(e.target.value)}
-                      readOnly={token.length > 0}
                       data-testid="input-token"
                     />
-                    {token && (
-                      <p className="text-sm text-muted-foreground">
-                        Código listo para resetear tu contraseña
-                      </p>
-                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="newPassword">Nueva Contraseña</Label>
