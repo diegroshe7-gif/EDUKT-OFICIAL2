@@ -7,7 +7,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Upload, FileText, Calendar, DollarSign, MapPin, CreditCard, IdCard, Image, CheckCircle } from "lucide-react";
 import { ObjectUploader } from "@/components/ObjectUploader";
-import type { UploadResult } from "@uppy/core";
 import { apiRequest } from "@/lib/queryClient";
 
 interface TutorFormProps {
@@ -70,10 +69,9 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     };
   };
 
-  const handlePhotoComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful.length > 0 && currentPhotoPath) {
-      // Use the object path from the server response
-      setFormData(prev => ({ ...prev, fotoPerfil: currentPhotoPath }));
+  const handlePhotoComplete = (result: any) => {
+    if (result?.successful?.[0]?.path) {
+      setFormData(prev => ({ ...prev, fotoPerfil: result.successful[0].path }));
     }
   };
 
@@ -82,18 +80,15 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
       uploadURL: string;
       objectPath: string;
     };
-    // Store the object path for use after upload completes
-    setCurrentCVPath(response.objectPath);
     return {
-      method: "PUT" as const,
-      url: response.uploadURL,
+      uploadURL: response.uploadURL,
+      objectPath: response.objectPath,
     };
   };
 
-  const handleCVComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful.length > 0 && currentCVPath) {
-      // Use the object path from the server response
-      setFormData(prev => ({ ...prev, cv_url: currentCVPath }));
+  const handleCVComplete = (result: any) => {
+    if (result?.successful?.[0]?.path) {
+      setFormData(prev => ({ ...prev, cv_url: result.successful[0].path }));
     }
   };
 
