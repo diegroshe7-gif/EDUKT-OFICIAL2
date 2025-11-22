@@ -54,10 +54,16 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     onSubmit(formData);
   };
 
+  const [currentPhotoPath, setCurrentPhotoPath] = useState<string | null>(null);
+  const [currentCVPath, setCurrentCVPath] = useState<string | null>(null);
+
   const handlePhotoUpload = async () => {
-    const response = await apiRequest<{ uploadURL: string }>("/api/objects/upload", {
-      method: "POST",
-    });
+    const response = await apiRequest("POST", "/api/objects/upload") as unknown as { 
+      uploadURL: string;
+      objectPath: string;
+    };
+    // Store the object path for use after upload completes
+    setCurrentPhotoPath(response.objectPath);
     return {
       method: "PUT" as const,
       url: response.uploadURL,
@@ -65,21 +71,19 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
   };
 
   const handlePhotoComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful.length > 0) {
-      const uploadURL = result.successful[0].uploadURL;
-      if (uploadURL) {
-        // Store the object path for later retrieval
-        const objectPath = uploadURL.split('?')[0];
-        setFormData(prev => ({ ...prev, fotoPerfil: objectPath }));
-        setIsUploadingPhoto(false);
-      }
+    if (result.successful && result.successful.length > 0 && currentPhotoPath) {
+      // Use the object path from the server response
+      setFormData(prev => ({ ...prev, fotoPerfil: currentPhotoPath }));
     }
   };
 
   const handleCVUpload = async () => {
-    const response = await apiRequest<{ uploadURL: string }>("/api/objects/upload", {
-      method: "POST",
-    });
+    const response = await apiRequest("POST", "/api/objects/upload") as unknown as { 
+      uploadURL: string;
+      objectPath: string;
+    };
+    // Store the object path for use after upload completes
+    setCurrentCVPath(response.objectPath);
     return {
       method: "PUT" as const,
       url: response.uploadURL,
@@ -87,14 +91,9 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
   };
 
   const handleCVComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    if (result.successful && result.successful.length > 0) {
-      const uploadURL = result.successful[0].uploadURL;
-      if (uploadURL) {
-        // Store the object path for later retrieval
-        const objectPath = uploadURL.split('?')[0];
-        setFormData(prev => ({ ...prev, cv_url: objectPath }));
-        setIsUploadingCV(false);
-      }
+    if (result.successful && result.successful.length > 0 && currentCVPath) {
+      // Use the object path from the server response
+      setFormData(prev => ({ ...prev, cv_url: currentCVPath }));
     }
   };
 
@@ -209,34 +208,32 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                     <Image className="h-4 w-4 inline mr-1" />
                     Foto de Perfil
                   </Label>
-                  <div className="flex items-center gap-2">
-                    <ObjectUploader
-                      maxNumberOfFiles={1}
-                      maxFileSize={5242880}
-                      allowedFileTypes={['image/*']}
-                      onGetUploadParameters={handlePhotoUpload}
-                      onComplete={handlePhotoComplete}
-                      buttonVariant="outline"
-                      buttonClassName="w-full"
-                    >
-                      {formData.fotoPerfil ? (
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          Cambiar foto
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Upload className="h-4 w-4" />
-                          Subir foto
-                        </div>
-                      )}
-                    </ObjectUploader>
-                  </div>
-                  {formData.fotoPerfil && (
-                    <p className="text-xs text-muted-foreground">
-                      ✓ Foto cargada correctamente
-                    </p>
-                  )}
+                  <ObjectUploader
+                    maxNumberOfFiles={1}
+                    maxFileSize={5242880}
+                    allowedFileTypes={['image/*']}
+                    onGetUploadParameters={handlePhotoUpload}
+                    onComplete={handlePhotoComplete}
+                    buttonVariant="outline"
+                    buttonClassName="w-full"
+                  >
+                    {formData.fotoPerfil ? (
+                      <div>
+                        <p className="text-sm font-medium text-green-600">
+                          ✓ Foto cargada - Click o arrastra para cambiar
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm font-medium">
+                          Arrastra tu foto aquí o haz click
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          JPG, PNG hasta 5MB
+                        </p>
+                      </div>
+                    )}
+                  </ObjectUploader>
                 </div>
               </div>
             </CardContent>
@@ -507,25 +504,22 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                   buttonClassName="w-full"
                 >
                   {formData.cv_url ? (
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      Cambiar documento
+                    <div>
+                      <p className="text-sm font-medium text-green-600">
+                        ✓ Documento cargado - Click o arrastra para cambiar
+                      </p>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <Upload className="h-4 w-4" />
-                      Subir CV o documento
+                    <div>
+                      <p className="text-sm font-medium">
+                        Arrastra tu CV aquí o haz click
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        PDF, Word hasta 10MB
+                      </p>
                     </div>
                   )}
                 </ObjectUploader>
-                {formData.cv_url && (
-                  <p className="text-xs text-muted-foreground">
-                    ✓ Documento cargado correctamente
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Formatos permitidos: PDF, Word. Tamaño máximo: 10 MB
-                </p>
               </div>
             </CardContent>
           </Card>

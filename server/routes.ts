@@ -70,16 +70,42 @@ function verifyBookingToken(token: string, paymentIntentId: string, alumnoId: st
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Referenced from blueprint:javascript_object_storage - Public file uploading endpoints
-  // This endpoint serves uploaded files publicly (no authentication required)
+  // This endpoint serves uploaded files with ACL enforcement
   app.get("/objects/:objectPath(*)", async (req, res) => {
     const objectStorageService = new ObjectStorageService();
     try {
-      const objectFile = await objectStorageService.getObjectEntityFile(
-        req.path,
-      );
-      objectStorageService.downloadObject(objectFile, res);
+      // Extract the relative path from the request
+      const relativePath = req.params.objectPath;
+      
+      // Try to find the file in public directories first
+      const publicFile = await objectStorageService.searchPublicObject(relativePath);
+      
+      if (publicFile) {
+        // File found in public directory - accessible without authentication
+        return objectStorageService.downloadObject(publicFile, res);
+      }
+      
+      // If not found in public, try private directory
+      try {
+        const privateFile = await objectStorageService.getObjectEntityFile(req.path);
+        
+        // For private files, check ACL authorization
+        // In this MVP, tutor registration files are public (stored in public dir)
+        // Private files would require authentication which we don't have yet
+        // For now, reject access to private files
+        console.log("Attempted access to private file without authentication:", req.path);
+        return res.status(403).json({ 
+          error: "Access denied. This file requires authentication." 
+        });
+      } catch (privateError) {
+        // File not found in either public or private directories
+        if (privateError instanceof ObjectNotFoundError) {
+          return res.sendStatus(404);
+        }
+        throw privateError;
+      }
     } catch (error) {
-      console.error("Error checking object access:", error);
+      console.error("Error serving object:", error);
       if (error instanceof ObjectNotFoundError) {
         return res.sendStatus(404);
       }
@@ -87,12 +113,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // This endpoint gets the presigned upload URL for file uploads
+  // This endpoint gets the presigned upload URL for file uploads (public)
   app.post("/api/objects/upload", async (req, res) => {
     try {
       const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      res.json({ uploadURL });
+      const { uploadURL, objectPath } = await objectStorageService.getPublicObjectUploadURL();
+      res.json({ uploadURL, objectPath });
     } catch (error) {
       console.error("Error generating upload URL:", error);
       res.status(500).json({ error: "Failed to generate upload URL" });
