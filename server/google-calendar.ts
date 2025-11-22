@@ -135,25 +135,31 @@ export async function sendPasswordResetEmail(email: string, resetToken: string, 
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
     
-    const resetLink = `${process.env.VITE_API_BASE_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}&type=${userType}`;
-    
     const emailContent = `
       <h2>Restablecer tu contraseña</h2>
       <p>Recibimos una solicitud para restablecer tu contraseña en EDUKT.</p>
-      <p>Haz clic en el siguiente enlace para crear una nueva contraseña:</p>
-      <p><a href="${resetLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Restablecer Contraseña</a></p>
-      <p>Este enlace expira en 1 hora.</p>
+      <p>Tu código de reseteo es:</p>
+      <p style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; font-size: 24px; font-weight: bold; letter-spacing: 2px; text-align: center; font-family: monospace;">${resetToken}</p>
+      <p>Copia este código y pégalo en la página de reseteo de contraseña.</p>
+      <p>Este código expira en 1 hora.</p>
       <p>Si no solicitaste restablecer tu contraseña, puedes ignorar este email de forma segura.</p>
     `;
 
-    const message = `From: noreply@edukt.com
-To: ${email}
-Subject: Restablecer tu contraseña en EDUKT
-Content-Type: text/html; charset=utf-8
+    const message = [
+      'Content-Type: text/html; charset=utf-8',
+      'MIME-Version: 1.0',
+      `To: ${email}`,
+      'From: EDUKT <notificationsedukt@gmail.com>',
+      'Subject: Código para restablecer tu contraseña en EDUKT',
+      '',
+      emailContent
+    ].join('\n');
 
-${emailContent}`;
-
-    const base64EncodedEmail = Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+    const base64EncodedEmail = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
 
     await gmail.users.messages.send({
       userId: 'me',
@@ -162,11 +168,12 @@ ${emailContent}`;
       },
     });
     
+    console.log(`Password reset email sent to ${email}`);
     return true;
   } catch (error: any) {
-    if (error.status === 403 && error.message?.includes('insufficient authentication scopes')) {
-      console.warn('Gmail scope not authorized in Google Calendar connection. Email sending requires re-authorization.');
-      return false;
+    console.error('Error sending password reset email:', error);
+    if (error.status === 403) {
+      console.warn('Gmail scope not authorized. Please re-authorize Google Calendar connection with Gmail scope.');
     }
     throw error;
   }
