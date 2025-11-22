@@ -1,10 +1,11 @@
 import { google } from 'googleapis';
 
-let connectionSettings: any;
+let calendarConnectionSettings: any;
+let gmailConnectionSettings: any;
 
-async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
+async function getCalendarAccessToken() {
+  if (calendarConnectionSettings && calendarConnectionSettings.settings.expires_at && new Date(calendarConnectionSettings.settings.expires_at).getTime() > Date.now()) {
+    return calendarConnectionSettings.settings.access_token;
   }
   
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
@@ -18,7 +19,7 @@ async function getAccessToken() {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
-  connectionSettings = await fetch(
+  calendarConnectionSettings = await fetch(
     'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-calendar',
     {
       headers: {
@@ -28,10 +29,44 @@ async function getAccessToken() {
     }
   ).then(res => res.json()).then(data => data.items?.[0]);
 
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
+  const accessToken = calendarConnectionSettings?.settings?.access_token || calendarConnectionSettings.settings?.oauth?.credentials?.access_token;
 
-  if (!connectionSettings || !accessToken) {
+  if (!calendarConnectionSettings || !accessToken) {
     throw new Error('Google Calendar not connected');
+  }
+  return accessToken;
+}
+
+async function getGmailAccessToken() {
+  if (gmailConnectionSettings && gmailConnectionSettings.settings.expires_at && new Date(gmailConnectionSettings.settings.expires_at).getTime() > Date.now()) {
+    return gmailConnectionSettings.settings.access_token;
+  }
+  
+  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
+  const xReplitToken = process.env.REPL_IDENTITY 
+    ? 'repl ' + process.env.REPL_IDENTITY 
+    : process.env.WEB_REPL_RENEWAL 
+    ? 'depl ' + process.env.WEB_REPL_RENEWAL 
+    : null;
+
+  if (!xReplitToken) {
+    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+  }
+
+  gmailConnectionSettings = await fetch(
+    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=google-mail',
+    {
+      headers: {
+        'Accept': 'application/json',
+        'X_REPLIT_TOKEN': xReplitToken
+      }
+    }
+  ).then(res => res.json()).then(data => data.items?.[0]);
+
+  const accessToken = gmailConnectionSettings?.settings?.access_token || gmailConnectionSettings.settings?.oauth?.credentials?.access_token;
+
+  if (!gmailConnectionSettings || !accessToken) {
+    throw new Error('Gmail not connected');
   }
   return accessToken;
 }
@@ -40,7 +75,7 @@ async function getAccessToken() {
 // Access tokens expire, so a new client must be created each time.
 // Always call this function again to get a fresh client.
 export async function getUncachableGoogleCalendarClient() {
-  const accessToken = await getAccessToken();
+  const accessToken = await getCalendarAccessToken();
 
   const oauth2Client = new google.auth.OAuth2();
   oauth2Client.setCredentials({
@@ -48,6 +83,20 @@ export async function getUncachableGoogleCalendarClient() {
   });
 
   return google.calendar({ version: 'v3', auth: oauth2Client });
+}
+
+// WARNING: Never cache this client.
+// Access tokens expire, so a new client must be created each time.
+// Always call this function again to get a fresh client.
+export async function getUncachableGmailClient() {
+  const accessToken = await getGmailAccessToken();
+
+  const oauth2Client = new google.auth.OAuth2();
+  oauth2Client.setCredentials({
+    access_token: accessToken
+  });
+
+  return google.gmail({ version: 'v1', auth: oauth2Client });
 }
 
 export interface CalendarEventDetails {
@@ -126,14 +175,7 @@ export async function deleteCalendarEvent(eventId: string): Promise<void> {
 
 export async function sendPasswordResetEmail(email: string, resetToken: string, userType: 'tutor' | 'alumno'): Promise<boolean> {
   try {
-    const accessToken = await getAccessToken();
-    
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({
-      access_token: accessToken
-    });
-
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+    const gmail = await getUncachableGmailClient();
     
     const emailContent = `
       <h2>Restablecer tu contraseña</h2>
@@ -172,9 +214,6 @@ export async function sendPasswordResetEmail(email: string, resetToken: string, 
     return true;
   } catch (error: any) {
     console.error('Error sending password reset email:', error);
-    if (error.status === 403) {
-      console.warn('Gmail scope not authorized. Please re-authorize Google Calendar connection with Gmail scope.');
-    }
     throw error;
   }
 }
