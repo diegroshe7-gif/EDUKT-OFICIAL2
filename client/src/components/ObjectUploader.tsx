@@ -77,32 +77,20 @@ export function ObjectUploader({
 
       // Get presigned URL
       const params = await onGetUploadParameters();
+      console.log("Upload params:", { method: params.method, urlLength: params.url.length });
       
-      // Upload file
-      const xhr = new XMLHttpRequest();
-      
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const percentComplete = Math.round((e.loaded / e.total) * 100);
-          setProgress(percentComplete);
-        }
+      // Upload file using fetch
+      // Note: Don't set Content-Type for presigned URLs - let the browser handle it
+      const response = await fetch(params.url, {
+        method: params.method,
+        body: file,
       });
 
-      await new Promise((resolve, reject) => {
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(null);
-          } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
-          }
-        });
-        xhr.addEventListener('error', () => reject(new Error('Upload failed')));
-        xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
-
-        xhr.open(params.method, params.url);
-        xhr.setRequestHeader('Content-Type', file.type);
-        xhr.send(file);
-      });
+      console.log("Upload response status:", response.status);
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed with status ${response.status}`);
+      }
 
       setIsUploading(false);
       setHasCompleted(true);
