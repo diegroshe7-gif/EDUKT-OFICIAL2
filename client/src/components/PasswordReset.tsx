@@ -44,24 +44,11 @@ export default function PasswordReset({ userType, onBack }: PasswordResetProps) 
         throw new Error(error.error || "No se pudo enviar el email");
       }
 
-      const data = await response.json();
-      
-      if (data.token) {
-        // Development mode: token is returned in response
-        toast({
-          title: "Token generado",
-          description: `Código: ${data.token.substring(0, 8)}...`,
-        });
-        setToken(data.token);
-        setStep("token");
-      } else {
-        // Production mode: token sent via email
-        toast({
-          title: "Email enviado",
-          description: "Revisa tu email para el código de reseteo",
-        });
-        setStep("token");
-      }
+      toast({
+        title: "Email enviado",
+        description: "Revisa tu email para el enlace de reseteo de contraseña",
+      });
+      setStep("token");
     } catch (error) {
       toast({
         title: "Error",
