@@ -7,6 +7,7 @@ import Stripe from "stripe";
 import crypto from "crypto";
 import { createTutoringSession } from "./google-calendar";
 import { hashPassword, verifyPassword, verifyAdminCredentials } from "./auth";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 // Use test key in development, production key otherwise
 const stripeKey = process.env.NODE_ENV === 'development' 
@@ -68,6 +69,36 @@ function verifyBookingToken(token: string, paymentIntentId: string, alumnoId: st
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Referenced from blueprint:javascript_object_storage - Public file uploading endpoints
+  // This endpoint serves uploaded files publicly (no authentication required)
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(
+        req.path,
+      );
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error checking object access:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // This endpoint gets the presigned upload URL for file uploads
+  app.post("/api/objects/upload", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error generating upload URL:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
   // Tutor routes
   app.post("/api/tutors", async (req, res) => {
     try {
