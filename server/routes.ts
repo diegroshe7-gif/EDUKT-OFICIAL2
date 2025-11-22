@@ -5,14 +5,12 @@ import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReview
 import { z } from "zod";
 import Stripe from "stripe";
 import crypto from "crypto";
-import { createTutoringSession } from "./google-calendar";
+import { createTutoringSession, sendPasswordResetEmail } from "./google-calendar";
 import { hashPassword, verifyPassword, verifyAdminCredentials } from "./auth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { db } from "./db";
 import { resetTokens } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import https from "https";
-import http from "http";
 
 // Use test key in development, production key otherwise
 const stripeKey = process.env.NODE_ENV === 'development' 
@@ -512,63 +510,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt,
       });
 
-      // Send email with reset token using Resend
-      const resendApiKey = process.env.RESEND_API_KEY;
-      if (resendApiKey) {
-        const resetLink = `${process.env.VITE_API_BASE_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}&type=${userType}`;
-        
-        try {
-          const payload = JSON.stringify({
-            from: 'noreply@edukt.com',
-            to: email,
-            subject: 'Restablecer tu contraseña en EDUKT',
-            html: `
-              <h2>Restablecer contraseña</h2>
-              <p>Hiciste una solicitud para restablecer tu contraseña.</p>
-              <p>Haz clic en el siguiente enlace para restablecer tu contraseña:</p>
-              <p><a href="${resetLink}">Restablecer contraseña</a></p>
-              <p>Este enlace expira en 1 hora.</p>
-              <p>Si no solicitaste restablecer tu contraseña, ignora este email.</p>
-            `,
-          });
-
-          await new Promise<void>((resolve, reject) => {
-            const req = https.request('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${resendApiKey}`,
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(payload),
-              },
-            }, (res) => {
-              let data = '';
-              res.on('data', (chunk) => { data += chunk; });
-              res.on('end', () => {
-                if (res.statusCode === 200 || res.statusCode === 201) {
-                  console.log(`Reset email sent to ${email}`);
-                  resolve();
-                } else {
-                  console.error('Resend API error:', data);
-                  reject(new Error(`Resend API error: ${res.statusCode}`));
-                }
-              });
-            });
-            
-            req.on('error', (err) => reject(err));
-            req.write(payload);
-            req.end();
-          });
-        } catch (emailError) {
-          console.error('Error sending reset email:', emailError);
-          // Don't fail the request if email fails in development
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`[DEV] Reset token: ${resetToken}`);
-          }
-        }
-      } else {
-        console.warn('RESEND_API_KEY not configured');
+      // Send email with reset token using Gmail API
+      try {
+        await sendPasswordResetEmail(email, resetToken, userType);
+        console.log(`Reset email sent to ${email}`);
+      } catch (emailError) {
+        console.error('Error sending reset email:', emailError);
+        // Don't fail the request if email fails
         if (process.env.NODE_ENV === 'development') {
-          console.log(`[DEV] Reset token: ${resetToken}`);
+          console.log(`[DEV] Reset token for testing: ${resetToken}`);
         }
       }
       
