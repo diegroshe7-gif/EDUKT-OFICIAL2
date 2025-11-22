@@ -206,12 +206,15 @@ export default function AdminPanel({ pending, approved, rejected, onApprove, onR
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <Tabs defaultValue="pending" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="pending" data-testid="tab-pending">
               Pendientes ({pending.length})
             </TabsTrigger>
             <TabsTrigger value="approved" data-testid="tab-approved">
               Aprobados ({approved.length})
+            </TabsTrigger>
+            <TabsTrigger value="all-tutors" data-testid="tab-all-tutors">
+              Todos los Tutores ({approved.length})
             </TabsTrigger>
             <TabsTrigger value="rejected" data-testid="tab-rejected">
               Rechazados ({rejected.length})
@@ -248,6 +251,28 @@ export default function AdminPanel({ pending, approved, rejected, onApprove, onR
                 {approved.map((tutor, index) => (
                   <TutorReviewCard key={index} tutor={tutor} index={index} isPending={false} />
                 ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="all-tutors" className="space-y-4">
+            {approved.length === 0 ? (
+              <Card>
+                <CardContent className="py-16 text-center">
+                  <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No hay tutores aprobados en el sistema</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-bold mb-4">Directorio de Tutores Aprobados</h2>
+                  <div className="grid gap-4">
+                    {approved.map((tutor, index) => (
+                      <TutorReviewCard key={index} tutor={tutor} index={index} isPending={false} />
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </TabsContent>
