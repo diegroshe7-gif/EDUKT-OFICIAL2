@@ -1,239 +1,563 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2, CheckCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { storage } from "./storage";
+import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReviewSchema, insertAvailabilitySlotSchema } from "@shared/schema";
+import { z } from "zod";
+import Stripe from "stripe";
+import crypto from "crypto";
+import { createTutoringSession } from "./google-calendar";
+import { hashPassword, verifyPassword, verifyAdminCredentials } from "./auth";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { db } from "./db";
+import { resetTokens } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
-interface PasswordResetProps {
-  userType: "tutor" | "alumno";
-  onBack: () => void;
+// Use test key in development, production key otherwise
+const stripeKey = process.env.NODE_ENV === 'development' 
+  ? process.env.TESTING_STRIPE_SECRET_KEY 
+  : process.env.STRIPE_SECRET_KEY;
+
+const stripe = stripeKey 
+  ? new Stripe(stripeKey, { apiVersion: "2025-10-29.clover" })
+  : null;
+
+if (process.env.NODE_ENV === 'development') {
+  console.log(`[Stripe] Using ${stripeKey ? 'TESTING_STRIPE_SECRET_KEY' : 'no Stripe key'}`);
 }
 
-export default function PasswordReset({ userType, onBack }: PasswordResetProps) {
-  const { toast } = useToast();
-  const [step, setStep] = useState<"email" | "token" | "new-password" | "success">("email");
-  const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+// Generate HMAC token for booking verification
+const BOOKING_TOKEN_SECRET = process.env.SESSION_SECRET || "edukt-booking-secret-key";
 
-  const handleRequestReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      toast({
-        title: "Error",
-        description: "Por favor ingresa tu email",
-        variant: "destructive",
-      });
-      return;
+function generateBookingToken(paymentIntentId: string, alumnoId: string, tutorId: string): string {
+  const timestamp = Date.now();
+  const data = `${paymentIntentId}:${alumnoId}:${tutorId}:${timestamp}`;
+  const signature = crypto.createHmac('sha256', BOOKING_TOKEN_SECRET)
+    .update(data)
+    .digest('hex');
+  return `${data}:${signature}`;
+}
+
+function verifyBookingToken(token: string, paymentIntentId: string, alumnoId: string, tutorId: string): boolean {
+  try {
+    const parts = token.split(':');
+    if (parts.length !== 5) {
+      return false;
     }
+    
+    const [storedIntentId, storedAlumnoId, storedTutorId, timestamp, signature] = parts;
+    
+    // Verify all IDs match
+    if (storedIntentId !== paymentIntentId || 
+        storedAlumnoId !== alumnoId || 
+        storedTutorId !== tutorId) {
+      return false;
+    }
+    
+    // Verify token is not too old (24 hours)
+    const tokenAge = Date.now() - parseInt(timestamp);
+    if (tokenAge > 24 * 60 * 60 * 1000) {
+      return false;
+    }
+    
+    // Verify signature
+    const data = `${storedIntentId}:${storedAlumnoId}:${storedTutorId}:${timestamp}`;
+    const expectedSignature = crypto.createHmac('sha256', BOOKING_TOKEN_SECRET)
+      .update(data)
+      .digest('hex');
+    
+    return signature === expectedSignature;
+  } catch (error) {
+    return false;
+  }
+}
 
-    setIsLoading(true);
+export async function registerRoutes(app: Express): Promise<Server> {
+  // File serving
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
     try {
-      const response = await fetch("/api/auth/request-reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, userType }),
-      });
+      const relativePath = req.params.objectPath;
+      const publicFile = await objectStorageService.searchPublicObject(relativePath);
+      
+      if (publicFile) {
+        return objectStorageService.downloadObject(publicFile, res);
+      }
+      
+      console.log("File not found in public directories:", relativePath);
+      return res.sendStatus(404);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "No se pudo enviar el email");
+  // Upload URL endpoint
+  app.post("/api/objects/upload", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const { uploadURL, objectPath } = await objectStorageService.getPublicObjectUploadURL();
+      res.json({ uploadURL, objectPath });
+    } catch (error) {
+      console.error("Error generating upload URL:", error);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+  // Tutor routes
+  app.post("/api/tutors", async (req, res) => {
+    try {
+      const validatedData = insertTutorSchema.parse(req.body);
+      const hashedPassword = await hashPassword(validatedData.password);
+      const tutorData = { ...validatedData, password: hashedPassword };
+      const tutor = await storage.createTutor(tutorData);
+      const { password, ...tutorResponse } = tutor;
+      res.json(tutorResponse);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid tutor data", details: error.errors });
+      } else {
+        console.error("Error creating tutor:", error);
+        res.status(500).json({ error: "Failed to create tutor" });
+      }
+    }
+  });
+
+  app.get("/api/tutors/approved", async (req, res) => {
+    try {
+      const tutors = await storage.getAllApprovedTutors();
+      res.json(tutors);
+    } catch (error) {
+      console.error("Error fetching approved tutors:", error);
+      res.status(500).json({ error: "Failed to fetch tutors" });
+    }
+  });
+
+  app.get("/api/tutors/pending", async (req, res) => {
+    try {
+      const tutors = await storage.getTutorsByStatus("pendiente");
+      res.json(tutors);
+    } catch (error) {
+      console.error("Error fetching pending tutors:", error);
+      res.status(500).json({ error: "Failed to fetch tutors" });
+    }
+  });
+
+  app.get("/api/tutors/rejected", async (req, res) => {
+    try {
+      const tutors = await storage.getTutorsByStatus("rechazado");
+      res.json(tutors);
+    } catch (error) {
+      console.error("Error fetching rejected tutors:", error);
+      res.status(500).json({ error: "Failed to fetch tutors" });
+    }
+  });
+
+  app.get("/api/tutors/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const tutor = await storage.getTutorById(id);
+      if (!tutor) {
+        return res.status(404).json({ error: "Tutor not found" });
+      }
+      res.json(tutor);
+    } catch (error) {
+      console.error("Error fetching tutor:", error);
+      res.status(500).json({ error: "Failed to fetch tutor" });
+    }
+  });
+
+  app.patch("/api/tutors/:id/approve", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const tutorToApprove = await storage.getTutorById(id);
+      if (!tutorToApprove) {
+        return res.status(404).json({ error: "Tutor not found" });
       }
 
-      toast({
-        title: "Email enviado",
-        description: "Revisa tu email para el enlace de reseteo",
-      });
-      setStep("token");
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error desconocido",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token || !newPassword || !confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Por favor completa todos los campos",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Las contraseñas no coinciden",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      toast({
-        title: "Error",
-        description: "La contraseña debe tener al menos 8 caracteres",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const response = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, newPassword, userType }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "No se pudo resetear la contraseña");
+      // Validate KYC
+      if (!tutorToApprove.clabe || !tutorToApprove.banco || !tutorToApprove.rfc) {
+        return res.status(400).json({ 
+          error: "Información bancaria incompleta. El tutor debe proporcionar CLABE, banco y RFC." 
+        });
       }
 
-      toast({
-        title: "¡Éxito!",
-        description: "Tu contraseña ha sido reseteada",
-      });
-      setStep("success");
+      if (!tutorToApprove.fechaNacimiento || !tutorToApprove.direccion || 
+          !tutorToApprove.ciudad || !tutorToApprove.estado || !tutorToApprove.codigoPostal) {
+        return res.status(400).json({ 
+          error: "Información de verificación incompleta." 
+        });
+      }
+
+      if (!/^\d{18}$/.test(tutorToApprove.clabe)) {
+        return res.status(400).json({ error: "CLABE inválida." });
+      }
+
+      if (!/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(tutorToApprove.rfc)) {
+        return res.status(400).json({ error: "RFC inválido." });
+      }
+
+      const birthDate = new Date(tutorToApprove.fechaNacimiento);
+      const age = Math.floor((Date.now() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      if (age < 18) {
+        return res.status(400).json({ error: "El tutor debe ser mayor de 18 años." });
+      }
+
+      let stripeAccountId = tutorToApprove.stripeAccountId;
+
+      // Try Stripe Connect
+      if (stripe && !stripeAccountId) {
+        try {
+          const nameParts = tutorToApprove.nombre.trim().split(/\s+/);
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(' ') || nameParts[0];
+
+          const dob = new Date(tutorToApprove.fechaNacimiento);
+          const dobDay = dob.getDate();
+          const dobMonth = dob.getMonth() + 1;
+          const dobYear = dob.getFullYear();
+
+          const clientIp = req.ip || req.headers['x-forwarded-for'] as string || '127.0.0.1';
+
+          console.log(`Creating Stripe Connect account for tutor ${id}`);
+
+          const account = await stripe.accounts.create({
+            type: 'custom',
+            country: 'MX',
+            email: tutorToApprove.email,
+            capabilities: {
+              card_payments: { requested: true },
+              transfers: { requested: true },
+            },
+            business_type: 'individual',
+            business_profile: {
+              mcc: '8299',
+              product_description: 'Servicios de tutoría académica',
+            },
+            individual: {
+              email: tutorToApprove.email,
+              first_name: firstName,
+              last_name: lastName,
+              dob: {
+                day: dobDay,
+                month: dobMonth,
+                year: dobYear,
+              },
+              address: {
+                line1: tutorToApprove.direccion,
+                city: tutorToApprove.ciudad,
+                state: tutorToApprove.estado,
+                postal_code: tutorToApprove.codigoPostal,
+                country: 'MX',
+              },
+              id_number: tutorToApprove.rfc,
+            },
+            tos_acceptance: {
+              date: Math.floor(Date.now() / 1000),
+              ip: clientIp,
+            },
+            metadata: {
+              tutorId: id,
+              nombre: tutorToApprove.nombre,
+              rfc: tutorToApprove.rfc,
+            },
+          });
+
+          stripeAccountId = account.id;
+          console.log(`Created Stripe account: ${stripeAccountId}`);
+
+          await stripe.accounts.createExternalAccount(stripeAccountId, {
+            external_account: {
+              object: 'bank_account',
+              country: 'MX',
+              currency: 'mxn',
+              routing_number: tutorToApprove.clabe,
+              account_number: tutorToApprove.clabe,
+              account_holder_name: tutorToApprove.nombre,
+              account_holder_type: 'individual',
+            },
+          });
+
+          await storage.updateTutorStripeAccount(id, stripeAccountId);
+        } catch (stripeError: any) {
+          console.warn("Warning: Could not create Stripe Connect:", stripeError.message);
+          console.log("Approving tutor without Stripe account");
+        }
+      }
+
+      const tutor = await storage.updateTutorStatus(id, "aprobado");
+      res.json(tutor);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error desconocido",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      console.error("Error approving tutor:", error);
+      res.status(500).json({ error: "Failed to approve tutor" });
     }
-  };
+  });
 
-  return (
-    <div className="min-h-screen bg-background py-12 px-4">
-      <div className="max-w-md mx-auto space-y-6">
-        <Button 
-          variant="ghost" 
-          onClick={onBack}
-          className="gap-2"
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Volver
-        </Button>
+  app.patch("/api/tutors/:id/reject", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const tutor = await storage.updateTutorStatus(id, "rechazado");
+      if (!tutor) {
+        return res.status(404).json({ error: "Tutor not found" });
+      }
+      res.json(tutor);
+    } catch (error) {
+      console.error("Error rejecting tutor:", error);
+      res.status(500).json({ error: "Failed to reject tutor" });
+    }
+  });
 
-        {step === "success" ? (
-          <Card>
-            <CardContent className="pt-6 text-center space-y-4">
-              <CheckCircle className="h-12 w-12 text-green-600 mx-auto" />
-              <div>
-                <h2 className="text-2xl font-bold mb-2">¡Contraseña reseteada!</h2>
-                <p className="text-muted-foreground">
-                  Ahora puedes usar tu nueva contraseña para iniciar sesión
-                </p>
-              </div>
-              <Button 
-                onClick={onBack}
-                className="w-full"
-                data-testid="button-go-to-login"
-              >
-                Ir a Login
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Resetear Contraseña</CardTitle>
-              <CardDescription>
-                Ingresa tu email y te enviaremos un enlace para resetear tu contraseña
-              </CardDescription>
-            </CardHeader>
+  app.post("/api/tutors/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password required" });
+      }
 
-            <CardContent>
-              {step === "email" && (
-                <form onSubmit={handleRequestReset} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="tu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      data-testid="input-email"
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    className="w-full gap-2"
-                    data-testid="button-send-email"
-                  >
-                    {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Enviar Email
-                  </Button>
-                </form>
-              )}
+      const tutor = await storage.getTutorByEmail(email);
+      if (!tutor) {
+        return res.status(401).json({ error: "Email o contraseña inválidos" });
+      }
 
-              {step === "token" && (
-                <form onSubmit={handleResetPassword} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="token">Código de Reseteo</Label>
-                    <Input
-                      id="token"
-                      placeholder="Código recibido en tu email"
-                      value={token}
-                      onChange={(e) => setToken(e.target.value)}
-                      data-testid="input-token"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">Nueva Contraseña</Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      placeholder="Mínimo 8 caracteres"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      data-testid="input-new-password"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      placeholder="Confirma tu contraseña"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      data-testid="input-confirm-password"
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    disabled={isLoading}
-                    className="w-full gap-2"
-                    data-testid="button-reset-password"
-                  >
-                    {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Resetear Contraseña
-                  </Button>
-                </form>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </div>
-  );
+      const passwordValid = await verifyPassword(password, tutor.password);
+      if (!passwordValid) {
+        return res.status(401).json({ error: "Email o contraseña inválidos" });
+      }
+
+      const { password: _, ...tutorResponse } = tutor;
+      res.json(tutorResponse);
+    } catch (error) {
+      console.error("Error logging in tutor:", error);
+      res.status(500).json({ error: "Failed to log in" });
+    }
+  });
+
+  // Student routes
+  app.post("/api/alumnos", async (req, res) => {
+    try {
+      const validatedData = insertAlumnoSchema.parse(req.body);
+      const hashedPassword = await hashPassword(validatedData.password);
+      const alumnoData = { ...validatedData, password: hashedPassword };
+      const alumno = await storage.createAlumno(alumnoData);
+      const { password, ...alumnoResponse } = alumno;
+      res.json(alumnoResponse);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid data", details: error.errors });
+      } else {
+        console.error("Error creating alumno:", error);
+        res.status(500).json({ error: "Failed to create student" });
+      }
+    }
+  });
+
+  app.get("/api/alumnos", async (req, res) => {
+    try {
+      const alumnos = await storage.getAllAlumnos();
+      res.json(alumnos);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch students" });
+    }
+  });
+
+  app.post("/api/alumnos/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password required" });
+      }
+
+      const alumno = await storage.getAlumnoByEmail(email);
+      if (!alumno) {
+        return res.status(401).json({ error: "Email o contraseña inválidos" });
+      }
+
+      const passwordValid = await verifyPassword(password, alumno.password);
+      if (!passwordValid) {
+        return res.status(401).json({ error: "Email o contraseña inválidos" });
+      }
+
+      const { password: _, ...alumnoResponse } = alumno;
+      res.json(alumnoResponse);
+    } catch (error) {
+      console.error("Error logging in alumno:", error);
+      res.status(500).json({ error: "Failed to log in" });
+    }
+  });
+
+  // Sessions
+  app.post("/api/sesiones", async (req, res) => {
+    try {
+      const validatedData = insertSesionSchema.parse(req.body);
+      const sesion = await storage.createSesion(validatedData);
+      res.json(sesion);
+    } catch (error) {
+      console.error("Error creating sesion:", error);
+      res.status(500).json({ error: "Failed to create session" });
+    }
+  });
+
+  app.get("/api/sesiones/:id", async (req, res) => {
+    try {
+      const sesion = await storage.getSesionById(req.params.id);
+      if (!sesion) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json(sesion);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch session" });
+    }
+  });
+
+  app.get("/api/sesiones/tutor/:tutorId", async (req, res) => {
+    try {
+      const sesiones = await storage.getSesionesByTutor(req.params.tutorId);
+      res.json(sesiones);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sessions" });
+    }
+  });
+
+  app.get("/api/sesiones/alumno/:alumnoId", async (req, res) => {
+    try {
+      const sesiones = await storage.getSesionesByAlumno(req.params.alumnoId);
+      res.json(sesiones);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sessions" });
+    }
+  });
+
+  // Reviews
+  app.post("/api/reviews", async (req, res) => {
+    try {
+      const validatedData = insertReviewSchema.parse(req.body);
+      const review = await storage.createReview(validatedData);
+      res.json(review);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create review" });
+    }
+  });
+
+  app.get("/api/reviews/tutor/:tutorId", async (req, res) => {
+    try {
+      const reviews = await storage.getReviewsByTutor(req.params.tutorId);
+      res.json(reviews);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch reviews" });
+    }
+  });
+
+  app.get("/api/reviews/tutor/:tutorId/average", async (req, res) => {
+    try {
+      const average = await storage.getAverageRatingForTutor(req.params.tutorId);
+      res.json({ average });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch average" });
+    }
+  });
+
+  // Availability slots
+  app.post("/api/availability-slots", async (req, res) => {
+    try {
+      const validatedData = insertAvailabilitySlotSchema.parse(req.body);
+      const slot = await storage.createAvailabilitySlot(validatedData);
+      res.json(slot);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create slot" });
+    }
+  });
+
+  app.get("/api/availability-slots/tutor/:tutorId", async (req, res) => {
+    try {
+      const slots = await storage.getAvailabilitySlotsByTutor(req.params.tutorId);
+      res.json(slots);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch slots" });
+    }
+  });
+
+  app.delete("/api/availability-slots/:id", async (req, res) => {
+    try {
+      await storage.deleteAvailabilitySlot(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete slot" });
+    }
+  });
+
+  // Password reset endpoints
+  app.post("/api/auth/request-reset", async (req, res) => {
+    try {
+      const { email, userType } = req.body;
+      
+      if (!email || !userType) {
+        return res.status(400).json({ error: "Email and userType required" });
+      }
+
+      // Generate reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+
+      await db.insert(resetTokens).values({
+        email,
+        userType,
+        token: resetToken,
+        expiresAt,
+      });
+
+      // TODO: Send email with reset link
+      console.log(`Reset token for ${email}: ${resetToken}`);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error requesting reset:", error);
+      res.status(500).json({ error: "Failed to request reset" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword, userType } = req.body;
+
+      const result = await db.select().from(resetTokens).where(eq(resetTokens.token, token)).limit(1);
+      const resetToken = result[0];
+
+      if (!resetToken) {
+        return res.status(400).json({ error: "Invalid reset token" });
+      }
+
+      if (new Date() > resetToken.expiresAt) {
+        return res.status(400).json({ error: "Reset token expired" });
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+
+      if (userType === "tutor") {
+        await storage.updateTutorPasswordByEmail(resetToken.email, hashedPassword);
+      } else {
+        await storage.updateAlumnoPasswordByEmail(resetToken.email, hashedPassword);
+      }
+
+      // Delete used token
+      await db.delete(resetTokens).where(eq(resetTokens.token, token));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
+  // Health check
+  app.get("/health", (req, res) => {
+    res.json({ status: "ok" });
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
 }
