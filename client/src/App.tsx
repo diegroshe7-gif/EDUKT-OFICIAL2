@@ -16,19 +16,31 @@ import StudentPortal from "@/components/StudentPortal";
 import AdminPanel from "@/components/AdminPanel";
 import TutorPortal from "@/components/TutorPortal";
 import PasswordReset from "@/components/PasswordReset";
+import ResetPasswordPage from "@/components/ResetPasswordPage";
+import { useLocation } from "wouter";
 
 function Router() {
   const { toast } = useToast();
+  const [location] = useLocation();
   const [view, setView] = useState<'landing' | 'tutor-registro' | 'tutor-login' | 'tutor-portal' | 'alumno-registro' | 'alumno-login' | 'alumno' | 'admin-login' | 'admin' | 'tutor-reset' | 'alumno-reset' | null>('landing');
   const [alumnoRegistrado, setAlumnoRegistrado] = useState<any>(null);
   const [tutorActual, setTutorActual] = useState<any>(null);
+
+  // Parse reset token from URL
+  const resetToken = new URLSearchParams(location.split('?')[1] || '').get('token');
+  const resetType = new URLSearchParams(location.split('?')[1] || '').get('type') as "tutor" | "alumno" | null;
 
   useEffect(() => {
     const savedAlumno = localStorage.getItem('edukt_alumno');
     if (savedAlumno) {
       setAlumnoRegistrado(JSON.parse(savedAlumno));
     }
-  }, []);
+    
+    // Check if this is a reset-password URL
+    if (location.includes('/reset-password') && resetToken && resetType) {
+      // Token found, component will render automatically
+    }
+  }, [location, resetToken, resetType]);
   
   const { data: approvedTutors = [], refetch: refetchApproved } = useQuery<any[]>({
     queryKey: ['/api/tutors/approved'],
@@ -213,6 +225,20 @@ function Router() {
       description: `Total: $${total.toLocaleString('es-MX')} MXN (Tutor: $${subtotal.toLocaleString('es-MX')} + Tarifa: $${fee.toLocaleString('es-MX')})`,
     });
   };
+
+  // Show reset password page if token is present in URL
+  if (resetToken && resetType && location.includes('/reset-password')) {
+    return (
+      <ResetPasswordPage
+        token={resetToken}
+        userType={resetType}
+        onSuccess={() => {
+          setView(resetType === 'tutor' ? 'tutor-login' : 'alumno-login');
+          window.history.replaceState({}, '', '/');
+        }}
+      />
+    );
+  }
 
   return (
     <Switch>
