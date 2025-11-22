@@ -5,7 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, FileText, Calendar, DollarSign, MapPin, CreditCard, IdCard } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Calendar, DollarSign, MapPin, CreditCard, IdCard, Image, CheckCircle } from "lucide-react";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import type { UploadResult } from "@uppy/core";
+import { apiRequest } from "@/lib/queryClient";
 
 interface TutorFormProps {
   onSubmit: (data: any) => void;
@@ -39,6 +42,9 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     codigoPostal: "",
   });
 
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isUploadingCV, setIsUploadingCV] = useState(false);
+
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -46,6 +52,50 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
+  };
+
+  const handlePhotoUpload = async () => {
+    const response = await apiRequest<{ uploadURL: string }>("/api/objects/upload", {
+      method: "POST",
+    });
+    return {
+      method: "PUT" as const,
+      url: response.uploadURL,
+    };
+  };
+
+  const handlePhotoComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    if (result.successful && result.successful.length > 0) {
+      const uploadURL = result.successful[0].uploadURL;
+      if (uploadURL) {
+        // Store the object path for later retrieval
+        const objectPath = uploadURL.split('?')[0];
+        setFormData(prev => ({ ...prev, fotoPerfil: objectPath }));
+        setIsUploadingPhoto(false);
+      }
+    }
+  };
+
+  const handleCVUpload = async () => {
+    const response = await apiRequest<{ uploadURL: string }>("/api/objects/upload", {
+      method: "POST",
+    });
+    return {
+      method: "PUT" as const,
+      url: response.uploadURL,
+    };
+  };
+
+  const handleCVComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    if (result.successful && result.successful.length > 0) {
+      const uploadURL = result.successful[0].uploadURL;
+      if (uploadURL) {
+        // Store the object path for later retrieval
+        const objectPath = uploadURL.split('?')[0];
+        setFormData(prev => ({ ...prev, cv_url: objectPath }));
+        setIsUploadingCV(false);
+      }
+    }
   };
 
   return (
@@ -155,15 +205,38 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="fotoPerfil">Foto de Perfil (URL)</Label>
-                  <Input
-                    id="fotoPerfil"
-                    type="url"
-                    placeholder="https://ejemplo.com/foto.jpg"
-                    value={formData.fotoPerfil}
-                    onChange={(e) => handleChange("fotoPerfil", e.target.value)}
-                    data-testid="input-foto-perfil"
-                  />
+                  <Label>
+                    <Image className="h-4 w-4 inline mr-1" />
+                    Foto de Perfil
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <ObjectUploader
+                      maxNumberOfFiles={1}
+                      maxFileSize={5242880}
+                      allowedFileTypes={['image/*']}
+                      onGetUploadParameters={handlePhotoUpload}
+                      onComplete={handlePhotoComplete}
+                      buttonVariant="outline"
+                      buttonClassName="w-full"
+                    >
+                      {formData.fotoPerfil ? (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          Cambiar foto
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Upload className="h-4 w-4" />
+                          Subir foto
+                        </div>
+                      )}
+                    </ObjectUploader>
+                  </div>
+                  {formData.fotoPerfil && (
+                    <p className="text-xs text-muted-foreground">
+                      ✓ Foto cargada correctamente
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -412,20 +485,47 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Upload className="h-5 w-5" />
-                Documentos y Enlaces
+                Documentos
               </CardTitle>
+              <CardDescription>
+                Sube tu CV o documentos que respalden tu experiencia
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cv_url">Enlace a CV (Google Drive, Dropbox, etc.)</Label>
-                <Input
-                  id="cv_url"
-                  type="url"
-                  placeholder="https://drive.google.com/..."
-                  value={formData.cv_url}
-                  onChange={(e) => handleChange("cv_url", e.target.value)}
-                  data-testid="input-cv-url"
-                />
+                <Label>
+                  <FileText className="h-4 w-4 inline mr-1" />
+                  Currículum Vitae (Opcional)
+                </Label>
+                <ObjectUploader
+                  maxNumberOfFiles={1}
+                  maxFileSize={10485760}
+                  allowedFileTypes={['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']}
+                  onGetUploadParameters={handleCVUpload}
+                  onComplete={handleCVComplete}
+                  buttonVariant="outline"
+                  buttonClassName="w-full"
+                >
+                  {formData.cv_url ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Cambiar documento
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Upload className="h-4 w-4" />
+                      Subir CV o documento
+                    </div>
+                  )}
+                </ObjectUploader>
+                {formData.cv_url && (
+                  <p className="text-xs text-muted-foreground">
+                    ✓ Documento cargado correctamente
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Formatos permitidos: PDF, Word. Tamaño máximo: 10 MB
+                </p>
               </div>
             </CardContent>
           </Card>
