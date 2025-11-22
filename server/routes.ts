@@ -511,18 +511,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Send email with reset token using Gmail API
+      let emailSent = false;
       try {
-        await sendPasswordResetEmail(email, resetToken, userType);
-        console.log(`Reset email sent to ${email}`);
+        emailSent = await sendPasswordResetEmail(email, resetToken, userType);
+        if (emailSent) {
+          console.log(`Reset email sent to ${email}`);
+        }
       } catch (emailError) {
         console.error('Error sending reset email:', emailError);
-        // Don't fail the request if email fails
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[DEV] Reset token for testing: ${resetToken}`);
-        }
       }
       
-      res.json({ success: true });
+      // In development, return token if email failed
+      const response: any = { success: true };
+      if (process.env.NODE_ENV === 'development' && !emailSent) {
+        response.devToken = resetToken;
+        console.log(`[DEV] Reset token (no email sent): ${resetToken}`);
+      }
+      
+      res.json(response);
     } catch (error) {
       console.error("Error requesting reset:", error);
       res.status(500).json({ error: "Failed to request reset" });
