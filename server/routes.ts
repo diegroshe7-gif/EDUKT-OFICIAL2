@@ -402,6 +402,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/confirm-session", async (req, res) => {
+    try {
+      const { paymentIntentId, bookingToken, alumnoId, tutorId } = req.body;
+
+      if (!paymentIntentId || !bookingToken || !alumnoId || !tutorId) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Verify booking token
+      if (!verifyBookingToken(bookingToken, paymentIntentId, alumnoId, tutorId)) {
+        return res.status(400).json({ error: "Invalid booking token" });
+      }
+
+      // Check if session already exists (idempotency)
+      const existingSession = await storage.getSesionByPaymentIntentId(paymentIntentId);
+      if (existingSession) {
+        console.log(`Session already exists for payment intent ${paymentIntentId}`);
+        return res.json({ 
+          sesion: existingSession,
+          emailsSent: true,
+          message: "Session already created"
+        });
+      }
+
+      // Get tutor and alumno details
+      const tutor = await storage.getTutorById(tutorId);
+      const alumno = await storage.getAlumnoById(alumnoId);
+
+      if (!tutor || !alumno) {
+        return res.status(404).json({ error: "Tutor or student not found" });
+      }
+
+      // TODO: Get actual class date/time and payment details from booking data
+      // For now, using placeholders
+      const startTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const durationHours = 1;
+      const tutorRate = tutor.tarifa || 300;
+      const subtotal = tutorRate * durationHours;
+      const platformFee = Math.round(subtotal * 0.08);
+      const total = subtotal + platformFee;
+
+      // Create calendar event and send emails
+      const calendarResult = await createTutoringSession({
+        tutorName: tutor.nombre,
+        tutorEmail: tutor.email,
+        studentName: alumno.nombre,
+        studentEmail: alumno.email,
+        startTime,
+        durationHours,
+      });
+
+      // Create session in database
+      const sesion = await storage.createSesion({
+        tutorId,
+        alumnoId,
+        fecha: startTime,
+        horas: durationHours,
+        subtotal,
+        platformFee,
+        total,
+        meetLink: calendarResult.meetLink,
+        googleCalendarEventId: calendarResult.eventId,
+        paymentIntentId,
+      });
+
+      res.json({ 
+        sesion,
+        emailsSent: calendarResult.emailsSent,
+        emailError: calendarResult.emailError,
+      });
+    } catch (error) {
+      console.error("Error confirming session:", error);
+      res.status(500).json({ error: "Failed to confirm session" });
+    }
+  });
+
   app.get("/api/sesiones/:id", async (req, res) => {
     try {
       const sesion = await storage.getSesionById(req.params.id);
