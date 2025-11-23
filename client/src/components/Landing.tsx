@@ -54,7 +54,7 @@ export default function Landing({ onSelectRole }: LandingProps) {
               <span className="text-accent">KT</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Portal de tutorías por hora. Clases online en Zoom o presenciales.
+              Portal de tutorías por hora. Clases online educate donde sea cuando sea.
             </p>
           </div>
         </motion.div>
