@@ -156,6 +156,7 @@ export const insertAvailabilitySlotSchema = createInsertSchema(availabilitySlots
   dayOfWeek: z.coerce.number().int().min(0).max(6),
   startTime: z.coerce.number().int().min(0).max(1439),
   endTime: z.coerce.number().int().min(0).max(1439),
+  tutorId: z.string().min(1, "Tutor ID es requerido"),
 }).omit({
   id: true,
   createdAt: true,
