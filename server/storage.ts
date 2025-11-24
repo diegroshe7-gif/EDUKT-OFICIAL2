@@ -54,6 +54,7 @@ export interface IStorage {
   
   createAvailabilitySlot(slot: InsertAvailabilitySlot): Promise<AvailabilitySlot>;
   getAvailabilitySlotsByTutor(tutorId: string): Promise<AvailabilitySlot[]>;
+  getAvailabilitySlotById(id: string): Promise<AvailabilitySlot | undefined>;
   deleteAvailabilitySlot(id: string): Promise<void>;
   
   createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
@@ -239,6 +240,12 @@ export class DbStorage implements IStorage {
         eq(availabilitySlots.tutorId, tutorId),
         eq(availabilitySlots.active, true)
       ));
+  }
+
+  async getAvailabilitySlotById(id: string): Promise<AvailabilitySlot | undefined> {
+    const result = await db.select().from(availabilitySlots)
+      .where(eq(availabilitySlots.id, id)).limit(1);
+    return result[0];
   }
 
   async deleteAvailabilitySlot(id: string): Promise<void> {
