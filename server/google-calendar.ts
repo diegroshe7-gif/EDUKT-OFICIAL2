@@ -422,3 +422,134 @@ export async function sendSupportTicketEmail(ticketDetails: {
     throw error;
   }
 }
+
+export async function sendTutorApprovalEmail(tutorName: string, tutorEmail: string): Promise<boolean> {
+  try {
+    const gmail = await getUncachableGmailClient();
+    
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #10b981;">¡Bienvenido a EDUKT!</h2>
+        <p>Hola ${tutorName},</p>
+        <p>¡Felicidades! Tu perfil ha sido aprobado y ahora eres parte de nuestra comunidad de tutores en EDUKT.</p>
+        
+        <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
+          <h3 style="margin-top: 0; color: #047857;">Tu perfil está activo</h3>
+          <p>Los estudiantes ahora pueden ver tu perfil y reservar clases contigo. Asegúrate de mantener tu disponibilidad actualizada para recibir más solicitudes.</p>
+        </div>
+
+        <div style="margin: 30px 0;">
+          <h3>Próximos pasos:</h3>
+          <ul style="line-height: 1.8;">
+            <li>Actualiza tu calendario de disponibilidad regularmente</li>
+            <li>Prepara tus materiales de enseñanza</li>
+            <li>Mantén una comunicación activa con tus estudiantes</li>
+            <li>Completa tus clases a tiempo para recibir buenas calificaciones</li>
+          </ul>
+        </div>
+
+        <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <p style="margin: 0;"><strong>Pagos:</strong> Recibirás el 92% del valor de cada clase directamente en tu cuenta bancaria registrada después de completar la sesión.</p>
+        </div>
+
+        <p style="color: #666; font-size: 14px;">Si tienes alguna pregunta, no dudes en contactarnos.</p>
+        <p style="color: #666; font-size: 14px;">¡Mucho éxito!<br>El equipo de EDUKT</p>
+      </div>
+    `;
+
+    const message = [
+      'Content-Type: text/html; charset=utf-8',
+      'MIME-Version: 1.0',
+      `To: ${tutorEmail}`,
+      'From: EDUKT <notificationsedukt@gmail.com>',
+      'Subject: ¡Tu perfil ha sido aprobado en EDUKT!',
+      '',
+      emailContent
+    ].join('\n');
+
+    const base64EncodedEmail = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: base64EncodedEmail,
+      },
+    });
+    
+    console.log(`Approval email sent to ${tutorEmail}`);
+    return true;
+  } catch (error: any) {
+    console.error('Error sending tutor approval email:', error);
+    throw error;
+  }
+}
+
+export async function sendTutorRejectionEmail(tutorName: string, tutorEmail: string): Promise<boolean> {
+  try {
+    const gmail = await getUncachableGmailClient();
+    
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Actualización de tu solicitud en EDUKT</h2>
+        <p>Hola ${tutorName},</p>
+        <p>Gracias por tu interés en formar parte de nuestra comunidad de tutores en EDUKT.</p>
+        
+        <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+          <p style="margin: 0;">Lamentablemente, después de revisar tu perfil, hemos determinado que en este momento no cumple con todos nuestros requisitos para ser tutor en nuestra plataforma.</p>
+        </div>
+
+        <div style="margin: 30px 0;">
+          <h3>¿Qué puedes hacer?</h3>
+          <p>Te invitamos a revisar los siguientes aspectos de tu perfil:</p>
+          <ul style="line-height: 1.8;">
+            <li>Verifica que tu información personal esté completa y correcta</li>
+            <li>Asegúrate de haber proporcionado toda la documentación requerida</li>
+            <li>Revisa que tus credenciales y experiencia estén claramente descritas</li>
+            <li>Confirma que tu información bancaria esté correcta (CLABE, RFC, banco)</li>
+          </ul>
+          <p>Puedes volver a aplicar en cualquier momento una vez que hayas actualizado tu información.</p>
+        </div>
+
+        <div style="background-color: #f4f4f4; padding: 15px; border-radius: 5px; margin: 20px 0;">
+          <p style="margin: 0;"><strong>¿Necesitas ayuda?</strong> Si tienes preguntas sobre los requisitos o deseas más información, contáctanos respondiendo a este correo.</p>
+        </div>
+
+        <p style="color: #666; font-size: 14px;">Agradecemos tu comprensión y esperamos poder trabajar contigo en el futuro.</p>
+        <p style="color: #666; font-size: 14px;">Saludos,<br>El equipo de EDUKT</p>
+      </div>
+    `;
+
+    const message = [
+      'Content-Type: text/html; charset=utf-8',
+      'MIME-Version: 1.0',
+      `To: ${tutorEmail}`,
+      'From: EDUKT <notificationsedukt@gmail.com>',
+      'Subject: Actualización de tu solicitud en EDUKT',
+      '',
+      emailContent
+    ].join('\n');
+
+    const base64EncodedEmail = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: base64EncodedEmail,
+      },
+    });
+    
+    console.log(`Rejection email sent to ${tutorEmail}`);
+    return true;
+  } catch (error: any) {
+    console.error('Error sending tutor rejection email:', error);
+    throw error;
+  }
+}

@@ -5,7 +5,7 @@ import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReview
 import { z } from "zod";
 import Stripe from "stripe";
 import crypto from "crypto";
-import { createTutoringSession, sendPasswordResetEmail, sendSupportTicketEmail } from "./google-calendar";
+import { createTutoringSession, sendPasswordResetEmail, sendSupportTicketEmail, sendTutorApprovalEmail, sendTutorRejectionEmail } from "./google-calendar";
 import { hashPassword, verifyPassword, verifyAdminCredentials } from "./auth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { db } from "./db";
@@ -292,6 +292,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const tutor = await storage.updateTutorStatus(id, "aprobado");
+      
+      // Send approval email
+      try {
+        await sendTutorApprovalEmail(tutorToApprove.nombre, tutorToApprove.email);
+        console.log(`Approval email sent to ${tutorToApprove.email}`);
+      } catch (emailError) {
+        console.error("Error sending approval email:", emailError);
+        // Don't fail the approval if email fails
+      }
+      
       res.json(tutor);
     } catch (error) {
       console.error("Error approving tutor:", error);
@@ -302,10 +312,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tutors/:id/reject", async (req, res) => {
     try {
       const { id } = req.params;
-      const tutor = await storage.updateTutorStatus(id, "rechazado");
-      if (!tutor) {
+      
+      const tutorToReject = await storage.getTutorById(id);
+      if (!tutorToReject) {
         return res.status(404).json({ error: "Tutor not found" });
       }
+      
+      const tutor = await storage.updateTutorStatus(id, "rechazado");
+      
+      // Send rejection email
+      try {
+        await sendTutorRejectionEmail(tutorToReject.nombre, tutorToReject.email);
+        console.log(`Rejection email sent to ${tutorToReject.email}`);
+      } catch (emailError) {
+        console.error("Error sending rejection email:", emailError);
+        // Don't fail the rejection if email fails
+      }
+      
       res.json(tutor);
     } catch (error) {
       console.error("Error rejecting tutor:", error);
