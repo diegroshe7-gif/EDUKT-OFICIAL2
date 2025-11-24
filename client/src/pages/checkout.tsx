@@ -115,11 +115,12 @@ interface CheckoutProps {
   tutor: any;
   hours: number;
   alumno: any;
+  calculatedDate?: { startTime: string; endTime: string };
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-export default function Checkout({ tutor, hours, alumno, onSuccess, onCancel }: CheckoutProps) {
+export default function Checkout({ tutor, hours, alumno, calculatedDate, onSuccess, onCancel }: CheckoutProps) {
   const [clientSecret, setClientSecret] = useState("");
   const [bookingToken, setBookingToken] = useState("");
   const [amount, setAmount] = useState(0);
@@ -136,26 +137,34 @@ export default function Checkout({ tutor, hours, alumno, onSuccess, onCancel }: 
       return;
     }
 
-    apiRequest("POST", "/api/create-payment-intent", { 
-      tutorId: tutor.id,
-      alumnoId: alumno.id,
-      hours,
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) {
-          setError(data.error);
+    const createPaymentIntent = async () => {
+      try {
+        const response = await fetch("/api/create-payment-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            tutorId: tutor.id,
+            alumnoId: alumno.id,
+            hours,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          setError(data.error || "Error al inicializar el pago");
         } else {
           setClientSecret(data.clientSecret);
           setBookingToken(data.bookingToken);
           setAmount(data.amount);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         setError("Error al inicializar el pago. Por favor intenta de nuevo.");
         console.error(err);
-      });
-  }, [tutor.id, hours]);
+      }
+    };
+
+    createPaymentIntent();
+  }, [tutor.id, alumno.id, hours]);
 
   if (error) {
     return (

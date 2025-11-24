@@ -501,6 +501,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create payment intent
+  app.post("/api/create-payment-intent", async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(500).json({ error: "Stripe is not configured" });
+      }
+
+      const { tutorId, alumnoId, hours } = req.body;
+
+      if (!tutorId || !alumnoId || !hours) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const tutor = await storage.getTutorById(tutorId);
+      if (!tutor) {
+        return res.status(404).json({ error: "Tutor not found" });
+      }
+
+      const subtotal = Math.round(tutor.tarifa * hours * 100); // Convert to cents
+      const platformFee = Math.round(subtotal * 0.08);
+      const total = subtotal + platformFee;
+
+      // Create payment intent
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: total,
+        currency: "mxn",
+        description: `Tutoría con ${tutor.nombre} - ${hours} hora(s)`,
+        metadata: {
+          tutorId,
+          alumnoId,
+          hours: hours.toString(),
+        },
+      });
+
+      // Generate booking token
+      const bookingToken = generateBookingToken(paymentIntent.id, alumnoId, tutorId);
+
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        bookingToken,
+        amount: Math.round(total / 100), // Convert back to MXN
+      });
+    } catch (error) {
+      console.error("Error creating payment intent:", error);
+      res.status(500).json({ error: "Failed to create payment intent" });
+    }
+  });
+
   // Book session (calculate exact date/time based on slot and student's chosen times)
   app.post("/api/book-session", async (req, res) => {
     try {
@@ -609,6 +657,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Get payment intent details to extract hours
+      if (!stripe) {
+        return res.status(500).json({ error: "Stripe is not configured" });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const durationHours = paymentIntent.metadata?.hours ? parseFloat(paymentIntent.metadata.hours) : 1;
+
       // Get tutor and alumno details
       const tutor = await storage.getTutorById(tutorId);
       const alumno = await storage.getAlumnoById(alumnoId);
@@ -617,14 +673,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Tutor or student not found" });
       }
 
-      // TODO: Get actual class date/time and payment details from booking data
-      // For now, using placeholders
+      // Calculate session details
       const startTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      const durationHours = 1;
       const tutorRate = tutor.tarifa || 300;
       const subtotal = tutorRate * durationHours;
       const platformFee = Math.round(subtotal * 0.08);
       const total = subtotal + platformFee;
+
+      console.log(`Creating tutoring session for ${alumno.nombre} with ${tutor.nombre} - ${durationHours} hours`);
 
       // Create calendar event and send emails
       const calendarResult = await createTutoringSession({
@@ -649,6 +705,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         googleCalendarEventId: calendarResult.eventId,
         paymentIntentId,
       });
+
+      console.log(`Session created with Meet link: ${calendarResult.meetLink}`);
 
       res.json({ 
         sesion,

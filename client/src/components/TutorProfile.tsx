@@ -159,7 +159,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
     
     toast({
       title: "¡Clase agendada!",
-      description: "Tu clase ha sido reservada exitosamente"
+      description: "Tu clase ha sido reservada exitosamente. Pronto recibirás el email con los detalles y el link de Google Meet."
     });
     
     if (onBookingComplete) {
@@ -396,6 +396,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                               tutor={tutor}
                               hours={(endTimeMinutes! - startTimeMinutes!) / 60}
                               alumno={alumno}
+                              calculatedDate={calculatedDate}
                               onSuccess={handleCheckoutSuccess}
                               onCancel={handleCheckoutCancel}
                             />
