@@ -17,6 +17,7 @@ import AdminPanel from "@/components/AdminPanel";
 import TutorPortal from "@/components/TutorPortal";
 import PasswordReset from "@/components/PasswordReset";
 import ResetPasswordPage from "@/components/ResetPasswordPage";
+import SupportWidget from "@/components/SupportWidget";
 import { useLocation } from "wouter";
 
 function Router() {
@@ -298,6 +299,7 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Router />
+        <SupportWidget />
       </TooltipProvider>
     </QueryClientProvider>
   );
