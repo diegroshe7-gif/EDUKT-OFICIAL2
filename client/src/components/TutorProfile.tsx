@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import Checkout from "@/pages/checkout";
 import { DayPicker } from "react-day-picker";
+import { es } from "date-fns/locale";
 import "react-day-picker/dist/style.css";
 
 interface TutorProfileProps {
@@ -358,16 +359,8 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                                 // Only enable dates that match the selected slot's day of week
                                 return date.getDay() !== selectedSlot.dayOfWeek;
                               }}
-                              month={new Date()}
+                              locale={es}
                               showOutsideDays={false}
-                              locale={{ 
-                                months: [
-                                  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-                                ],
-                                weekdays: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
-                                firstDayOfWeek: 0
-                              }}
                               classNames={{
                                 day_disabled: "text-muted-foreground opacity-40 cursor-not-allowed"
                               }}
