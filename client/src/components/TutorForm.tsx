@@ -61,13 +61,14 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
   const [currentCVPath, setCurrentCVPath] = useState<string | null>(null);
 
   const handlePhotoUpload = async () => {
-    const response = await apiRequest("POST", "/api/objects/upload") as unknown as { 
+    const response = await apiRequest("POST", "/api/objects/upload");
+    const data = await response.json() as { 
       uploadURL: string;
       objectPath: string;
     };
     return {
-      uploadURL: response.uploadURL,
-      objectPath: response.objectPath,
+      uploadURL: data.uploadURL,
+      objectPath: data.objectPath,
     };
   };
 
@@ -87,13 +88,14 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
   };
 
   const handleCVUpload = async () => {
-    const response = await apiRequest("POST", "/api/objects/upload") as unknown as { 
+    const response = await apiRequest("POST", "/api/objects/upload");
+    const data = await response.json() as { 
       uploadURL: string;
       objectPath: string;
     };
     return {
-      uploadURL: response.uploadURL,
-      objectPath: response.objectPath,
+      uploadURL: data.uploadURL,
+      objectPath: data.objectPath,
     };
   };
 
