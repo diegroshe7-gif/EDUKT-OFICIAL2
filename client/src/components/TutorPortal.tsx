@@ -264,13 +264,32 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
                       <ObjectUploader
-                        onUploadComplete={(path: string) => {
-                          updatePhotoMutation.mutate(path);
+                        maxFileSize={5 * 1024 * 1024}
+                        allowedFileTypes={['image/*']}
+                        onGetUploadParameters={async () => {
+                          const response = await apiRequest("POST", "/api/objects/upload");
+                          const data = await response.json() as { 
+                            uploadURL: string;
+                            objectPath: string;
+                          };
+                          return {
+                            uploadURL: data.uploadURL,
+                            objectPath: data.objectPath,
+                          };
                         }}
-                        accept="image/*"
-                        maxSize={5 * 1024 * 1024}
-                        label="Subir nueva foto de perfil"
-                      />
+                        onComplete={(result: any) => {
+                          if (result?.successful?.[0]?.path) {
+                            updatePhotoMutation.mutate(result.successful[0].path);
+                          }
+                        }}
+                      >
+                        <div>
+                          <p className="text-sm font-medium">Click o arrastra tu foto aquí</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            JPG, PNG hasta 5MB
+                          </p>
+                        </div>
+                      </ObjectUploader>
                     </div>
                   </DialogContent>
                 </Dialog>
