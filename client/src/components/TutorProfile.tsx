@@ -41,6 +41,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
   const [startTimeMinutes, setStartTimeMinutes] = useState<number | null>(null);
   const [endTimeMinutes, setEndTimeMinutes] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [calculatedDate, setCalculatedDate] = useState<{ startTime: string; endTime: string } | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -63,12 +64,39 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
     return a.startTime - b.startTime;
   }) : [];
 
+  const getAvailableDates = () => {
+    const dates: { value: string; label: string }[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Generate dates for the next 12 weeks
+    for (let i = 0; i < 84; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + i);
+      const dayOfWeek = date.getDay();
+      
+      // Check if this day of week matches the selected slot
+      if (dayOfWeek === selectedSlot.dayOfWeek && i > 0) {
+        const dateStr = date.toISOString().split('T')[0];
+        const label = date.toLocaleDateString('es-MX', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+        dates.push({ value: dateStr, label });
+      }
+    }
+    
+    return dates;
+  };
+
   const handleCalculateDate = async () => {
-    if (!selectedSlot || startTimeMinutes === null || endTimeMinutes === null) {
+    if (!selectedSlot || startTimeMinutes === null || endTimeMinutes === null || !selectedDate) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Selecciona un horario y define la hora de inicio y fin"
+        description: "Selecciona un día, horario y define la hora de inicio y fin"
       });
       return;
     }
@@ -103,7 +131,8 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
           alumnoId,
           tutorId: tutor.id,
           startTimeMinutes,
-          endTimeMinutes
+          endTimeMinutes,
+          targetDate: selectedDate
         })
       });
 
@@ -286,6 +315,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                             setSelectedSlot(slot);
                             setStartTimeMinutes(null);
                             setEndTimeMinutes(null);
+                            setSelectedDate("");
                             setCalculatedDate(null);
                           }}
                         >
@@ -301,6 +331,30 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {selectedSlot && (
+                        <div className="space-y-2">
+                          <Label>Selecciona una fecha</Label>
+                          <Select
+                            value={selectedDate}
+                            onValueChange={(value) => {
+                              setSelectedDate(value);
+                              setCalculatedDate(null);
+                            }}
+                          >
+                            <SelectTrigger data-testid="select-date">
+                              <SelectValue placeholder="Elige una fecha" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getAvailableDates().map((date: any) => (
+                                <SelectItem key={date.value} value={date.value}>
+                                  {date.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
 
                       {selectedSlot && (
                         <>
