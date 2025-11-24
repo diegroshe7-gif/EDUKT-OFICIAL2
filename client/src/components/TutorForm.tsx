@@ -25,7 +25,6 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     modalidad: "online",
     ubicacion: "",
     tarifa: "",
-    disponibilidad: "",
     cv_url: "",
     bio: "",
     universidad: "",
@@ -381,37 +380,24 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                Tarifa y Disponibilidad
+                Tarifa por Hora
               </CardTitle>
+              <CardDescription>
+                Podrás configurar tu disponibilidad desde tu perfil una vez aprobado
+              </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tarifa">Tarifa por Hora (MXN) *</Label>
-                  <Input
-                    id="tarifa"
-                    type="number"
-                    placeholder="400"
-                    value={formData.tarifa}
-                    onChange={(e) => handleChange("tarifa", e.target.value)}
-                    required
-                    data-testid="input-tarifa"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="disponibilidad">
-                    <Calendar className="h-4 w-4 inline mr-1" />
-                    Disponibilidad *
-                  </Label>
-                  <Input
-                    id="disponibilidad"
-                    placeholder="Ej: Lun-Mie 16:00-20:00"
-                    value={formData.disponibilidad}
-                    onChange={(e) => handleChange("disponibilidad", e.target.value)}
-                    required
-                    data-testid="input-disponibilidad"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="tarifa">Tarifa por Hora (MXN) *</Label>
+                <Input
+                  id="tarifa"
+                  type="number"
+                  placeholder="400"
+                  value={formData.tarifa}
+                  onChange={(e) => handleChange("tarifa", e.target.value)}
+                  required
+                  data-testid="input-tarifa"
+                />
               </div>
             </CardContent>
           </Card>
