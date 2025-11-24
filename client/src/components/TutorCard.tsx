@@ -19,7 +19,7 @@ interface TutorCardProps {
     tarifa: number;
     disponibilidad: string;
     bio?: string;
-    avatarUrl?: string;
+    fotoPerfil?: string;
   };
   onSchedule?: (tutor: any) => void;
   onViewProfile?: (tutor: any) => void;
@@ -44,7 +44,12 @@ export default function TutorCard({ tutor, onSchedule, onViewProfile }: TutorCar
       <CardHeader className="pb-4">
         <div className="flex items-start gap-4">
           <Avatar className="h-16 w-16">
-            <AvatarImage src={tutor.avatarUrl} alt={tutor.nombre} />
+            {tutor.fotoPerfil && (
+              <AvatarImage 
+                src={`/objects/${tutor.fotoPerfil}`} 
+                alt={tutor.nombre} 
+              />
+            )}
             <AvatarFallback className="text-lg font-semibold bg-primary text-primary-foreground">
               {initials}
             </AvatarFallback>
