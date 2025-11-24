@@ -73,7 +73,12 @@ export function ObjectUploader({
       }
 
       // Get upload URL from server
-      const { uploadURL, objectPath } = await onGetUploadParameters();
+      const uploadParams = await onGetUploadParameters();
+      console.log("🔍 Parámetros de upload recibidos:", uploadParams);
+      
+      const { uploadURL, objectPath } = uploadParams;
+      console.log("📦 uploadURL:", uploadURL);
+      console.log("📦 objectPath:", objectPath);
 
       // Upload to presigned URL
       const response = await fetch(uploadURL, {
@@ -92,6 +97,7 @@ export function ObjectUploader({
       });
 
       // Notify parent with the object path
+      console.log("📢 Llamando onComplete con objectPath:", objectPath);
       onComplete?.({
         successful: [{ path: objectPath }],
       });
