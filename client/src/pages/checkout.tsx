@@ -146,6 +146,8 @@ export default function Checkout({ tutor, hours, alumno, calculatedDate, onSucce
             tutorId: tutor.id,
             alumnoId: alumno.id,
             hours,
+            startTime: calculatedDate?.startTime,
+            endTime: calculatedDate?.endTime,
           }),
         });
 
