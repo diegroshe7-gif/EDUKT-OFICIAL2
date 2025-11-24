@@ -25,7 +25,7 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
     modalidad: "online",
     ubicacion: "",
     tarifa: "",
-    cv_url: "",
+    cvUrl: "",
     bio: "",
     universidad: "",
     fotoPerfil: "",
@@ -60,11 +60,9 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
       uploadURL: string;
       objectPath: string;
     };
-    // Store the object path for use after upload completes
-    setCurrentPhotoPath(response.objectPath);
     return {
-      method: "PUT" as const,
-      url: response.uploadURL,
+      uploadURL: response.uploadURL,
+      objectPath: response.objectPath,
     };
   };
 
@@ -87,7 +85,7 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
 
   const handleCVComplete = (result: any) => {
     if (result?.successful?.[0]?.path) {
-      setFormData(prev => ({ ...prev, cv_url: result.successful[0].path }));
+      setFormData(prev => ({ ...prev, cvUrl: result.successful[0].path }));
     }
   };
 
@@ -484,7 +482,7 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
                   buttonVariant="outline"
                   buttonClassName="w-full"
                 >
-                  {formData.cv_url ? (
+                  {formData.cvUrl ? (
                     <div>
                       <p className="text-sm font-medium text-green-600">
                         ✓ Documento cargado - Click o arrastra para cambiar
