@@ -10,6 +10,7 @@ import { ArrowLeft, MapPin, DollarSign, Clock, Calendar, Star, User } from "luci
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import Checkout from "@/pages/checkout";
 
 interface TutorProfileProps {
   tutor: any;
@@ -42,6 +43,8 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
   const [endTimeMinutes, setEndTimeMinutes] = useState<number | null>(null);
   const [calculatedDate, setCalculatedDate] = useState<{ startTime: string; endTime: string } | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [alumno, setAlumno] = useState<any>(null);
 
   const { data: slots = [] } = useQuery({
     queryKey: ['/api/availability-slots/tutor', tutor.id],
@@ -125,11 +128,47 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
     }
   };
 
-  const handleProceedToPayment = () => {
+  const handleProceedToPayment = async () => {
+    if (!calculatedDate || startTimeMinutes === null || endTimeMinutes === null) {
+      return;
+    }
+    
+    // Load alumno data from localStorage
+    const alumnoData = localStorage.getItem('edukt_alumno');
+    if (!alumnoData) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se encontraron tus datos"
+      });
+      return;
+    }
+    
+    const alumnoObj = JSON.parse(alumnoData);
+    setAlumno(alumnoObj);
+    setShowCheckout(true);
+  };
+
+  const handleCheckoutSuccess = () => {
+    setShowCheckout(false);
+    setIsBookingDialogOpen(false);
+    setCalculatedDate(null);
+    setSelectedSlot(null);
+    setStartTimeMinutes(null);
+    setEndTimeMinutes(null);
+    
     toast({
-      title: "Próximamente",
-      description: "La integración de pagos está en desarrollo"
+      title: "¡Clase agendada!",
+      description: "Tu clase ha sido reservada exitosamente"
     });
+    
+    if (onBookingComplete) {
+      onBookingComplete();
+    }
+  };
+
+  const handleCheckoutCancel = () => {
+    setShowCheckout(false);
   };
 
   const initials = tutor.nombre
@@ -352,13 +391,23 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                             Total: ${(((endTimeMinutes! - startTimeMinutes!) / 60) * tutor.tarifa * 1.08).toFixed(2)} MXN
                             <span className="text-xs text-muted-foreground ml-2">(incluye 8% de servicio)</span>
                           </p>
-                          <Button 
-                            onClick={handleProceedToPayment}
-                            className="w-full mt-4"
-                            data-testid="button-proceed-payment"
-                          >
-                            Proceder al Pago
-                          </Button>
+                          {showCheckout && calculatedDate && alumno ? (
+                            <Checkout 
+                              tutor={tutor}
+                              hours={(endTimeMinutes! - startTimeMinutes!) / 60}
+                              alumno={alumno}
+                              onSuccess={handleCheckoutSuccess}
+                              onCancel={handleCheckoutCancel}
+                            />
+                          ) : (
+                            <Button 
+                              onClick={handleProceedToPayment}
+                              className="w-full mt-4"
+                              data-testid="button-proceed-payment"
+                            >
+                              Proceder al Pago
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
