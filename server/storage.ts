@@ -10,10 +10,12 @@ import {
   type Review,
   type InsertReview,
   type AvailabilitySlot,
-  type InsertAvailabilitySlot
+  type InsertAvailabilitySlot,
+  type SupportTicket,
+  type InsertSupportTicket
 } from "@shared/schema";
 import { db } from "./db";
-import { users, tutors, alumnos, sesiones, reviews, availabilitySlots } from "@shared/schema";
+import { users, tutors, alumnos, sesiones, reviews, availabilitySlots, supportTickets } from "@shared/schema";
 import { eq, and, avg } from "drizzle-orm";
 
 export interface IStorage {
@@ -52,6 +54,10 @@ export interface IStorage {
   createAvailabilitySlot(slot: InsertAvailabilitySlot): Promise<AvailabilitySlot>;
   getAvailabilitySlotsByTutor(tutorId: string): Promise<AvailabilitySlot[]>;
   deleteAvailabilitySlot(id: string): Promise<void>;
+  
+  createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
+  getAllSupportTickets(): Promise<SupportTicket[]>;
+  getSupportTicketById(id: string): Promise<SupportTicket | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -230,6 +236,20 @@ export class DbStorage implements IStorage {
     await db.update(availabilitySlots)
       .set({ active: false })
       .where(eq(availabilitySlots.id, id));
+  }
+
+  async createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket> {
+    const result = await db.insert(supportTickets).values(ticket).returning();
+    return result[0];
+  }
+
+  async getAllSupportTickets(): Promise<SupportTicket[]> {
+    return await db.select().from(supportTickets);
+  }
+
+  async getSupportTicketById(id: string): Promise<SupportTicket | undefined> {
+    const result = await db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return result[0];
   }
 }
 

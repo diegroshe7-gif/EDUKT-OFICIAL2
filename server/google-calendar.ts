@@ -361,3 +361,64 @@ export async function sendPasswordResetEmail(email: string, resetToken: string, 
     throw error;
   }
 }
+
+export async function sendSupportTicketEmail(ticketDetails: {
+  nombre: string;
+  email: string;
+  userType: string;
+  asunto: string;
+  mensaje: string;
+}): Promise<boolean> {
+  try {
+    const gmail = await getUncachableGmailClient();
+    
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Nuevo Ticket de Soporte - EDUKT</h2>
+        <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px; margin: 20px 0;">
+          <p><strong>De:</strong> ${ticketDetails.nombre}</p>
+          <p><strong>Email:</strong> ${ticketDetails.email}</p>
+          <p><strong>Tipo de usuario:</strong> ${ticketDetails.userType}</p>
+          <p><strong>Asunto:</strong> ${ticketDetails.asunto}</p>
+        </div>
+        <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 5px;">
+          <h3>Mensaje:</h3>
+          <p style="white-space: pre-wrap;">${ticketDetails.mensaje}</p>
+        </div>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 20px;">
+          Este email fue enviado automáticamente desde el sistema de soporte de EDUKT.
+        </p>
+      </div>
+    `;
+
+    const message = [
+      'Content-Type: text/html; charset=utf-8',
+      'MIME-Version: 1.0',
+      'To: notificationsedukt@gmail.com',
+      `From: EDUKT Soporte <notificationsedukt@gmail.com>`,
+      `Reply-To: ${ticketDetails.email}`,
+      `Subject: [SOPORTE] ${ticketDetails.asunto}`,
+      '',
+      emailContent
+    ].join('\n');
+
+    const base64EncodedEmail = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: base64EncodedEmail,
+      },
+    });
+    
+    console.log(`Support ticket email sent to notificationsedukt@gmail.com from ${ticketDetails.email}`);
+    return true;
+  } catch (error: any) {
+    console.error('Error sending support ticket email:', error);
+    throw error;
+  }
+}

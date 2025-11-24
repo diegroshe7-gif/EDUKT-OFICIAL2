@@ -1,11 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReviewSchema, insertAvailabilitySlotSchema } from "@shared/schema";
+import { insertTutorSchema, insertAlumnoSchema, insertSesionSchema, insertReviewSchema, insertAvailabilitySlotSchema, insertSupportTicketSchema } from "@shared/schema";
 import { z } from "zod";
 import Stripe from "stripe";
 import crypto from "crypto";
-import { createTutoringSession, sendPasswordResetEmail } from "./google-calendar";
+import { createTutoringSession, sendPasswordResetEmail, sendSupportTicketEmail } from "./google-calendar";
 import { hashPassword, verifyPassword, verifyAdminCredentials } from "./auth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { db } from "./db";
@@ -393,6 +393,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error logging in alumno:", error);
       res.status(500).json({ error: "Failed to log in" });
+    }
+  });
+
+  // Support tickets
+  app.post("/api/support", async (req, res) => {
+    try {
+      const validatedData = insertSupportTicketSchema.parse(req.body);
+      
+      // Save ticket to database
+      const ticket = await storage.createSupportTicket(validatedData);
+      
+      // Send email notification
+      await sendSupportTicketEmail({
+        nombre: validatedData.nombre,
+        email: validatedData.email,
+        userType: validatedData.userType,
+        asunto: validatedData.asunto,
+        mensaje: validatedData.mensaje,
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Tu mensaje ha sido enviado. Nos pondremos en contacto contigo pronto.",
+        ticketId: ticket.id
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Datos inválidos", details: error.errors });
+      } else {
+        console.error("Error creating support ticket:", error);
+        res.status(500).json({ error: "No se pudo enviar tu mensaje. Por favor intenta de nuevo." });
+      }
     }
   });
 

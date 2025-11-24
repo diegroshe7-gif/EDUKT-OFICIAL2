@@ -180,3 +180,26 @@ export const insertResetTokenSchema = createInsertSchema(resetTokens).omit({
 
 export type InsertResetToken = z.infer<typeof insertResetTokenSchema>;
 export type ResetToken = typeof resetTokens.$inferSelect;
+
+export const supportTickets = pgTable("support_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  nombre: text("nombre").notNull(),
+  email: text("email").notNull(),
+  userType: text("user_type").notNull(), // "tutor", "alumno", o "otro"
+  asunto: text("asunto").notNull(),
+  mensaje: text("mensaje").notNull(),
+  status: text("status").notNull().default("pendiente"), // "pendiente", "en_proceso", "resuelto"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSupportTicketSchema = createInsertSchema(supportTickets, {
+  email: z.string().email("Email inválido"),
+  mensaje: z.string().min(10, "El mensaje debe tener al menos 10 caracteres"),
+}).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+});
+
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
