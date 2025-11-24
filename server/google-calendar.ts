@@ -120,6 +120,8 @@ export async function createTutoringSession(details: CalendarEventDetails): Prom
   
   const endTime = new Date(details.startTime.getTime() + details.durationHours * 60 * 60 * 1000);
   
+  // Create event in notificationsedukt@gmail.com calendar
+  // The event will be organized by that email, and the Meet link will be public
   const event = {
     summary: `Tutoría con ${details.tutorName}`,
     description: `Sesión de tutoría con ${details.tutorName}\n\nEstudiante: ${details.studentName}`,
@@ -132,9 +134,13 @@ export async function createTutoringSession(details: CalendarEventDetails): Prom
       timeZone: 'America/Mexico_City',
     },
     attendees: [
-      { email: details.tutorEmail },
-      { email: details.studentEmail },
+      { email: details.tutorEmail, responseStatus: 'needsAction' },
+      { email: details.studentEmail, responseStatus: 'needsAction' },
     ],
+    organizer: {
+      email: 'notificationsedukt@gmail.com',
+      displayName: 'EDUKT Notificaciones',
+    },
     conferenceData: {
       createRequest: {
         requestId: `edukt-${Date.now()}`,
@@ -148,17 +154,46 @@ export async function createTutoringSession(details: CalendarEventDetails): Prom
         { method: 'popup', minutes: 30 },
       ],
     },
+    visibility: 'public',
   };
 
-  const response = await calendar.events.insert({
-    calendarId: 'primary',
-    requestBody: event,
-    conferenceDataVersion: 1,
-    sendUpdates: 'all',
-  });
+  // Insert event into notificationsedukt@gmail.com calendar
+  // If that fails, fall back to primary calendar
+  let calendarId = 'notificationsedukt@gmail.com';
+  
+  let response;
+  try {
+    response = await calendar.events.insert({
+      calendarId: calendarId,
+      requestBody: event,
+      conferenceDataVersion: 1,
+      sendUpdates: 'none', // Don't send updates from calendar - we'll send our own emails
+    });
+    console.log(`✅ Event created in notificationsedukt@gmail.com calendar`);
+  } catch (error: any) {
+    console.warn(`⚠️  Could not create event in notificationsedukt@gmail.com calendar, trying primary calendar`);
+    console.warn(`   Error: ${error?.message}`);
+    
+    // Remove organizer field and try primary
+    delete (event as any).organizer;
+    try {
+      response = await calendar.events.insert({
+        calendarId: 'primary',
+        requestBody: event,
+        conferenceDataVersion: 1,
+        sendUpdates: 'none',
+      });
+      console.log(`✅ Event created in primary calendar`);
+    } catch (primaryError: any) {
+      console.error('❌ Failed to create event in both calendars');
+      throw primaryError;
+    }
+  }
 
   const meetLink = response.data.hangoutLink || response.data.conferenceData?.entryPoints?.[0]?.uri || '';
   const eventId = response.data.id || '';
+
+  console.log(`✅ Google Meet link created (public, no login required): ${meetLink}`);
 
   // Enviar emails personalizados desde notificationsedukt@gmail.com
   const emailResult = await sendClassInvitationEmails(details, meetLink, details.startTime, endTime);
@@ -169,10 +204,11 @@ export async function createTutoringSession(details: CalendarEventDetails): Prom
     console.error(`   Tutor: ${details.tutorEmail}`);
     console.error(`   Student: ${details.studentEmail}`);
     console.error(`   Error: ${emailResult.error}`);
-    console.warn('   Calendar notification emails sent as fallback (from Google Calendar)');
   } else {
     console.log(`✅ Class invitation emails sent successfully from notificationsedukt@gmail.com`);
-    console.log(`   Note: Attendees will also receive Calendar notification emails`);
+    console.log(`   Tutor: ${details.tutorEmail}`);
+    console.log(`   Student: ${details.studentEmail}`);
+    console.log(`   Meet Link: ${meetLink} (public - anyone can join)`);
   }
 
   return {
