@@ -578,44 +578,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Calculate the actual date for this week in Mexico City timezone
-      // Create a date in Mexico City timezone (UTC-6 or UTC-5 depending on DST)
       const now = new Date();
       
-      // Get Mexico City timezone offset
-      const mexicoCityFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Mexico_City' });
-      const mexicoNow = new Date(mexicoCityFormatter.format(now));
-      const offset = now.getTime() - mexicoNow.getTime();
+      // Helper: Get Mexico City date parts using Intl
+      function getMexicoCityDateParts(date: Date) {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Mexico_City',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          weekday: 'long'
+        });
+        const parts = formatter.formatToParts(date);
+        const map = new Map(parts.map(p => [p.type, p.value]));
+        return {
+          year: parseInt(map.get('year') || '2025'),
+          month: parseInt(map.get('month') || '01') - 1, // 0-indexed
+          day: parseInt(map.get('day') || '01'),
+          weekday: map.get('weekday') || 'Sunday'
+        };
+      }
       
-      // Create today's date in Mexico City timezone
-      const today = new Date(now.getTime() - offset);
-      today.setHours(0, 0, 0, 0);
+      // Helper: Convert local date to UTC accounting for Mexico City timezone
+      function toUTCMexicoCity(year: number, month: number, day: number, hour: number, minute: number) {
+        // Create a date - JavaScript interprets this as UTC internally
+        const testDate = new Date(year, month, day, hour, minute, 0);
+        
+        // See what this UTC date looks like when formatted as Mexico City time
+        const mexFormatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Mexico_City',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        const formatted = mexFormatter.format(testDate);
+        const [datePart, timePart] = formatted.split(', ');
+        const [mYear, mMonth, mDay] = datePart.split('/').map(Number);
+        const [mHour, mMinute] = timePart.split(':').map(Number);
+        
+        // The difference between what we asked for and what Mexico City sees is the offset
+        const offset = (new Date(year, month, day, hour, minute, 0).getTime() - new Date(mYear, mMonth - 1, mDay, mHour, mMinute, 0).getTime());
+        
+        // Apply offset to get the correct UTC time for Mexico City
+        // testDate is UTC, but we want a time that shows the given hour/minute in Mexico City
+        // So we ADD the offset (not subtract)
+        return new Date(testDate.getTime() + offset);
+      }
       
-      const currentDayOfWeek = today.getDay();
+      // Get Mexico City day of week
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const mexToday = getMexicoCityDateParts(now);
+      const currentDayOfWeek = dayNames.indexOf(mexToday.weekday);
       const slotDayOfWeek = slot.dayOfWeek;
 
       let daysUntilSlot = slotDayOfWeek - currentDayOfWeek;
-      if (daysUntilSlot < 0) {
+      if (daysUntilSlot <= 0) {
         daysUntilSlot += 7;
       }
 
-      const sessionDateLocal = new Date(today);
-      sessionDateLocal.setDate(sessionDateLocal.getDate() + daysUntilSlot);
+      // Calculate the target date in Mexico City
+      const sessionDay = mexToday.day + daysUntilSlot;
+      let targetMonth = mexToday.month;
+      let targetYear = mexToday.year;
+      let targetDay = sessionDay;
+      
+      // Handle month overflow
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      if ((targetYear % 4 === 0 && targetYear % 100 !== 0) || targetYear % 400 === 0) {
+        daysInMonth[1] = 29;
+      }
+      
+      while (targetDay > daysInMonth[targetMonth]) {
+        targetDay -= daysInMonth[targetMonth];
+        targetMonth++;
+        if (targetMonth > 11) {
+          targetMonth = 0;
+          targetYear++;
+        }
+      }
 
-      // Set the start time in Mexico City timezone
+      // Set the start time
       const startHours = Math.floor(startTimeMinutes / 60);
       const startMins = startTimeMinutes % 60;
-      sessionDateLocal.setHours(startHours, startMins, 0, 0);
-
-      // Convert to UTC for ISO string
-      const sessionDate = new Date(sessionDateLocal.getTime() + offset);
 
       // Calculate end time
-      const endDateLocal = new Date(sessionDateLocal);
       const endHours = Math.floor(endTimeMinutes / 60);
       const endMins = endTimeMinutes % 60;
-      endDateLocal.setHours(endHours, endMins, 0, 0);
-      
-      const endDate = new Date(endDateLocal.getTime() + offset);
+
+      // Convert to UTC (these times are in Mexico City time)
+      const sessionDate = toUTCMexicoCity(targetYear, targetMonth, targetDay, startHours, startMins);
+      const endDate = toUTCMexicoCity(targetYear, targetMonth, targetDay, endHours, endMins);
 
       const durationHours = (endTimeMinutes - startTimeMinutes) / 60;
 
