@@ -508,7 +508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Stripe is not configured" });
       }
 
-      const { tutorId, alumnoId, hours } = req.body;
+      const { tutorId, alumnoId, hours, startTime, endTime } = req.body;
 
       if (!tutorId || !alumnoId || !hours) {
         return res.status(400).json({ error: "Missing required fields" });
@@ -532,6 +532,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tutorId,
           alumnoId,
           hours: hours.toString(),
+          startTime: startTime || '',
+          endTime: endTime || '',
         },
       });
 
@@ -657,13 +659,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get payment intent details to extract hours
+      // Get payment intent details to extract hours and dates
       if (!stripe) {
         return res.status(500).json({ error: "Stripe is not configured" });
       }
 
       const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
       const durationHours = paymentIntent.metadata?.hours ? parseFloat(paymentIntent.metadata.hours) : 1;
+      const startTimeStr = paymentIntent.metadata?.startTime;
+      const endTimeStr = paymentIntent.metadata?.endTime;
 
       // Get tutor and alumno details
       const tutor = await storage.getTutorById(tutorId);
@@ -673,14 +677,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Tutor or student not found" });
       }
 
-      // Calculate session details
-      const startTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      // Use the actual scheduled start time from the user's selection
+      const startTime = startTimeStr ? new Date(startTimeStr) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       const tutorRate = tutor.tarifa || 300;
       const subtotal = tutorRate * durationHours;
       const platformFee = Math.round(subtotal * 0.08);
       const total = subtotal + platformFee;
 
-      console.log(`Creating tutoring session for ${alumno.nombre} with ${tutor.nombre} - ${durationHours} hours`);
+      console.log(`Creating tutoring session for ${alumno.nombre} with ${tutor.nombre} - ${durationHours} hours on ${startTime.toISOString()}`);
 
       // Create calendar event and send emails
       const calendarResult = await createTutoringSession({
