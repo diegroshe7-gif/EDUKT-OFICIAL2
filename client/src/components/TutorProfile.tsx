@@ -272,11 +272,11 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                       Agendar Clase
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Agendar Clase con {tutor.nombre}</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 pt-4">
+                    <div className="space-y-4 pt-4 pb-4">
                       <div className="space-y-2">
                         <Label>Selecciona un día y horario disponible</Label>
                         <Select
