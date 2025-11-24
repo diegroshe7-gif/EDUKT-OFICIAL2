@@ -554,9 +554,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Book session (calculate exact date/time based on slot and student's chosen times)
   app.post("/api/book-session", async (req, res) => {
     try {
-      const { slotId, alumnoId, tutorId, startTimeMinutes, endTimeMinutes } = req.body;
+      const { slotId, alumnoId, tutorId, startTimeMinutes, endTimeMinutes, targetDate } = req.body;
 
-      if (!slotId || !alumnoId || !tutorId || startTimeMinutes === null || endTimeMinutes === null) {
+      if (!slotId || !alumnoId || !tutorId || startTimeMinutes === null || endTimeMinutes === null || !targetDate) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
@@ -577,40 +577,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "End time must be after start time" });
       }
 
-      // Simple approach: calculate days from today
-      // Get today's day of week in Mexico City timezone
-      const now = new Date();
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/Mexico_City',
-        weekday: 'long',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      });
+      // Parse the target date (should be in YYYY-MM-DD format)
+      const [yearStr, monthStr, dayStr] = targetDate.split('-');
+      const year = parseInt(yearStr);
+      const month = parseInt(monthStr) - 1;
+      const day = parseInt(dayStr);
       
-      const parts = formatter.formatToParts(now);
-      const partsMap = new Map(parts.map(p => [p.type, p.value]));
-      
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const mexWeekday = partsMap.get('weekday') || 'Sunday';
-      const mexDay = parseInt(partsMap.get('day') || '1');
-      const mexMonth = parseInt(partsMap.get('month') || '1') - 1;
-      const mexYear = parseInt(partsMap.get('year') || '2025');
-      
-      const todayDayOfWeek = dayNames.indexOf(mexWeekday);
-      const slotDayOfWeek = slot.dayOfWeek;
-      
-      // Calculate days until the target day of week
-      let daysUntil = slotDayOfWeek - todayDayOfWeek;
-      if (daysUntil < 0) {
-        daysUntil += 7;  // Next week if the day already passed
+      // Validate that the target date is the correct day of week
+      const targetDateObj = new Date(year, month, day);
+      if (targetDateObj.getDay() !== slot.dayOfWeek) {
+        return res.status(400).json({ 
+          error: "La fecha seleccionada no coincide con el día disponible del tutor" 
+        });
       }
-      if (daysUntil === 0) {
-        daysUntil = 7;   // If it's today, schedule for next week
-      }
-      
-      // Calculate target date
-      const targetDate = new Date(mexYear, mexMonth, mexDay + daysUntil);
       
       // Set hours/minutes from startTimeMinutes and endTimeMinutes
       const startHours = Math.floor(startTimeMinutes / 60);
@@ -619,9 +598,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endMins = endTimeMinutes % 60;
       
       // Create dates in local Mexico City time, then convert to ISO string
-      // The trick: create date in local time, then adjust for UTC
-      const sessionStart = new Date(mexYear, mexMonth, mexDay + daysUntil, startHours, startMins, 0);
-      const sessionEnd = new Date(mexYear, mexMonth, mexDay + daysUntil, endHours, endMins, 0);
+      const sessionStart = new Date(year, month, day, startHours, startMins, 0);
+      const sessionEnd = new Date(year, month, day, endHours, endMins, 0);
       
       // Get offset and adjust
       const testUTC = new Date(2025, 0, 15, 12, 0, 0); // A test date in UTC
