@@ -14,7 +14,7 @@ export const tutors = pgTable("tutors", {
   modalidad: text("modalidad").notNull(),
   ubicacion: text("ubicacion"),
   tarifa: integer("tarifa").notNull(),
-  disponibilidad: text("disponibilidad").notNull(),
+  disponibilidad: text("disponibilidad"),
   cvUrl: text("cv_url"),
   bio: text("bio"),
   universidad: text("universidad"),
