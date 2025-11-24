@@ -278,7 +278,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                     </DialogHeader>
                     <div className="space-y-4 pt-4 pb-4">
                       <div className="space-y-2">
-                        <Label>Selecciona un día y horario disponible</Label>
+                        <Label>Selecciona un día y horario disponible <span className="text-xs text-muted-foreground">(Hora Central - CST)</span></Label>
                         <Select
                           value={selectedSlot?.id || ""}
                           onValueChange={(value) => {
@@ -370,7 +370,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
 
                       {calculatedDate && (
                         <div className="p-4 bg-secondary rounded-lg space-y-2">
-                          <p className="font-medium">Tu clase será:</p>
+                          <p className="font-medium">Tu clase será: <span className="text-xs text-muted-foreground font-normal">(Hora Central - CST)</span></p>
                           <p className="text-sm">
                             <strong>Inicio:</strong> {new Date(calculatedDate.startTime).toLocaleString('es-MX', {
                               weekday: 'long',
@@ -427,22 +427,25 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                 El tutor aún no ha configurado sus horarios disponibles
               </p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {sortedSlots.map((slot: any) => (
-                  <div
-                    key={slot.id}
-                    className="flex items-center gap-3 p-3 border rounded-lg"
-                    data-testid={`available-slot-${slot.id}`}
-                  >
-                    <Clock className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{DAYS_OF_WEEK[slot.dayOfWeek].label}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {minutesToTime(slot.startTime)} - {minutesToTime(slot.endTime)}
-                      </p>
+              <div>
+                <p className="text-xs text-muted-foreground mb-3">Horarios disponibles (Hora Central - CST)</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {sortedSlots.map((slot: any) => (
+                    <div
+                      key={slot.id}
+                      className="flex items-center gap-3 p-3 border rounded-lg"
+                      data-testid={`available-slot-${slot.id}`}
+                    >
+                      <Clock className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">{DAYS_OF_WEEK[slot.dayOfWeek].label}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {minutesToTime(slot.startTime)} - {minutesToTime(slot.endTime)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
