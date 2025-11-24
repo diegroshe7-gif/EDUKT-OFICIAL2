@@ -49,6 +49,11 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("📤 Enviando formulario con datos:", {
+      fotoPerfil: formData.fotoPerfil,
+      cvUrl: formData.cvUrl,
+      nombre: formData.nombre
+    });
     onSubmit(formData);
   };
 
@@ -67,8 +72,17 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
   };
 
   const handlePhotoComplete = (result: any) => {
+    console.log("📸 handlePhotoComplete llamado con:", result);
     if (result?.successful?.[0]?.path) {
-      setFormData(prev => ({ ...prev, fotoPerfil: result.successful[0].path }));
+      const path = result.successful[0].path;
+      console.log("✅ Actualizando fotoPerfil a:", path);
+      setFormData(prev => {
+        const updated = { ...prev, fotoPerfil: path };
+        console.log("🔄 Estado actualizado:", { fotoPerfil: updated.fotoPerfil });
+        return updated;
+      });
+    } else {
+      console.log("❌ No se encontró path en result:", result);
     }
   };
 
@@ -84,8 +98,17 @@ export default function TutorForm({ onSubmit, onBack }: TutorFormProps) {
   };
 
   const handleCVComplete = (result: any) => {
+    console.log("📄 handleCVComplete llamado con:", result);
     if (result?.successful?.[0]?.path) {
-      setFormData(prev => ({ ...prev, cvUrl: result.successful[0].path }));
+      const path = result.successful[0].path;
+      console.log("✅ Actualizando cvUrl a:", path);
+      setFormData(prev => {
+        const updated = { ...prev, cvUrl: path };
+        console.log("🔄 Estado actualizado:", { cvUrl: updated.cvUrl });
+        return updated;
+      });
+    } else {
+      console.log("❌ No se encontró path en result:", result);
     }
   };
 
