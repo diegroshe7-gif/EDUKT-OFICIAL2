@@ -501,6 +501,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Book session (calculate exact date/time based on slot and student's chosen times)
+  app.post("/api/book-session", async (req, res) => {
+    try {
+      const { slotId, alumnoId, tutorId, startTimeMinutes, endTimeMinutes } = req.body;
+
+      if (!slotId || !alumnoId || !tutorId || startTimeMinutes === null || endTimeMinutes === null) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Get the availability slot
+      const slot = await storage.getAvailabilitySlotById(slotId);
+      if (!slot) {
+        return res.status(404).json({ error: "Availability slot not found" });
+      }
+
+      // Validate times are within slot range
+      if (startTimeMinutes < slot.startTime || endTimeMinutes > slot.endTime) {
+        return res.status(400).json({ 
+          error: `Times must be within ${minutesToTime(slot.startTime)} - ${minutesToTime(slot.endTime)}` 
+        });
+      }
+
+      if (endTimeMinutes <= startTimeMinutes) {
+        return res.status(400).json({ error: "End time must be after start time" });
+      }
+
+      // Calculate the actual date for this week
+      // Find the next occurrence of this day of week
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const currentDayOfWeek = today.getDay();
+      const slotDayOfWeek = slot.dayOfWeek;
+
+      let daysUntilSlot = slotDayOfWeek - currentDayOfWeek;
+      if (daysUntilSlot < 0) {
+        daysUntilSlot += 7;
+      }
+
+      const sessionDate = new Date(today);
+      sessionDate.setDate(sessionDate.getDate() + daysUntilSlot);
+
+      // Set the start time
+      const startHours = Math.floor(startTimeMinutes / 60);
+      const startMins = startTimeMinutes % 60;
+      sessionDate.setHours(startHours, startMins, 0, 0);
+
+      // Calculate end time
+      const endDate = new Date(sessionDate);
+      const endHours = Math.floor(endTimeMinutes / 60);
+      const endMins = endTimeMinutes % 60;
+      endDate.setHours(endHours, endMins, 0, 0);
+
+      const durationHours = (endTimeMinutes - startTimeMinutes) / 60;
+
+      res.json({
+        startTime: sessionDate.toISOString(),
+        endTime: endDate.toISOString(),
+        durationHours
+      });
+    } catch (error) {
+      console.error("Error booking session:", error);
+      res.status(500).json({ error: "Failed to book session" });
+    }
+  });
+
+  // Helper function to convert minutes to time string
+  function minutesToTime(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  }
+
   // Sessions
   app.post("/api/sesiones", async (req, res) => {
     try {
@@ -642,7 +714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/reviews/tutor/:tutorId/average", async (req, res) => {
     try {
       const average = await storage.getAverageRatingForTutor(req.params.tutorId);
-      res.json({ average });
+      res.json({ rating: average });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch average" });
     }

@@ -38,7 +38,8 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
   const { toast } = useToast();
   const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<any>(null);
-  const [hours, setHours] = useState("1");
+  const [startTimeMinutes, setStartTimeMinutes] = useState<number | null>(null);
+  const [endTimeMinutes, setEndTimeMinutes] = useState<number | null>(null);
   const [calculatedDate, setCalculatedDate] = useState<{ startTime: string; endTime: string } | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
 
@@ -60,11 +61,31 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
   }) : [];
 
   const handleCalculateDate = async () => {
-    if (!selectedSlot || !hours) {
+    if (!selectedSlot || startTimeMinutes === null || endTimeMinutes === null) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Selecciona un horario y número de horas"
+        description: "Selecciona un horario y define la hora de inicio y fin"
+      });
+      return;
+    }
+
+    // Validate that end time is after start time
+    if (endTimeMinutes <= startTimeMinutes) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "La hora de fin debe ser después de la hora de inicio"
+      });
+      return;
+    }
+
+    // Validate that times are within the slot range
+    if (startTimeMinutes < selectedSlot.startTime || endTimeMinutes > selectedSlot.endTime) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `El horario debe estar entre ${minutesToTime(selectedSlot.startTime)} y ${minutesToTime(selectedSlot.endTime)}`
       });
       return;
     }
@@ -78,7 +99,8 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
           slotId: selectedSlot.id,
           alumnoId,
           tutorId: tutor.id,
-          horas: parseFloat(hours)
+          startTimeMinutes,
+          endTimeMinutes
         })
       });
 
@@ -133,7 +155,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
           <CardHeader>
             <div className="flex items-start gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={tutor.fotoPerfil} alt={tutor.nombre} />
+                <AvatarImage src={tutor.fotoPerfil ? `/objects/${tutor.fotoPerfil}` : undefined} alt={tutor.nombre} />
                 <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
               </Avatar>
               <div className="flex-1">
@@ -217,12 +239,14 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                     </DialogHeader>
                     <div className="space-y-4 pt-4">
                       <div className="space-y-2">
-                        <Label>Horario</Label>
+                        <Label>Selecciona un día y horario disponible</Label>
                         <Select
                           value={selectedSlot?.id || ""}
                           onValueChange={(value) => {
                             const slot = sortedSlots.find((s: any) => s.id === value);
                             setSelectedSlot(slot);
+                            setStartTimeMinutes(null);
+                            setEndTimeMinutes(null);
                             setCalculatedDate(null);
                           }}
                         >
@@ -239,21 +263,62 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label>Duración (horas)</Label>
-                        <Input
-                          type="number"
-                          min="0.5"
-                          max="4"
-                          step="0.5"
-                          value={hours}
-                          onChange={(e) => {
-                            setHours(e.target.value);
-                            setCalculatedDate(null);
-                          }}
-                          data-testid="input-hours"
-                        />
-                      </div>
+                      {selectedSlot && (
+                        <>
+                          <div className="space-y-2">
+                            <Label>Hora de inicio (dentro de {minutesToTime(selectedSlot.startTime)} - {minutesToTime(selectedSlot.endTime)})</Label>
+                            <Select
+                              value={startTimeMinutes !== null ? startTimeMinutes.toString() : ""}
+                              onValueChange={(value) => {
+                                setStartTimeMinutes(parseInt(value));
+                                setCalculatedDate(null);
+                              }}
+                            >
+                              <SelectTrigger data-testid="select-start-time">
+                                <SelectValue placeholder="Elige hora de inicio" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: (selectedSlot.endTime - selectedSlot.startTime) / 30 + 1 }).map((_, idx) => {
+                                  const timeMinutes = selectedSlot.startTime + idx * 30;
+                                  if (timeMinutes >= selectedSlot.endTime) return null;
+                                  return (
+                                    <SelectItem key={timeMinutes} value={timeMinutes.toString()}>
+                                      {minutesToTime(timeMinutes)}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Hora de fin (después de {startTimeMinutes !== null ? minutesToTime(startTimeMinutes) : "la hora de inicio"})</Label>
+                            <Select
+                              value={endTimeMinutes !== null ? endTimeMinutes.toString() : ""}
+                              onValueChange={(value) => {
+                                setEndTimeMinutes(parseInt(value));
+                                setCalculatedDate(null);
+                              }}
+                            >
+                              <SelectTrigger data-testid="select-end-time">
+                                <SelectValue placeholder="Elige hora de fin" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: (selectedSlot.endTime - selectedSlot.startTime) / 30 + 1 }).map((_, idx) => {
+                                  const timeMinutes = selectedSlot.startTime + idx * 30;
+                                  if (timeMinutes <= (startTimeMinutes || selectedSlot.startTime)) return null;
+                                  if (timeMinutes > selectedSlot.endTime) return null;
+                                  return (
+                                    <SelectItem key={timeMinutes} value={timeMinutes.toString()}>
+                                      {minutesToTime(timeMinutes)}
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </>
+                      )}
 
                       <Button 
                         onClick={handleCalculateDate}
