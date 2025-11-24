@@ -577,10 +577,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "End time must be after start time" });
       }
 
-      // Calculate the actual date for this week
-      // Find the next occurrence of this day of week
-      const today = new Date();
+      // Calculate the actual date for this week in Mexico City timezone
+      // Create a date in Mexico City timezone (UTC-6 or UTC-5 depending on DST)
+      const now = new Date();
+      
+      // Get Mexico City timezone offset
+      const mexicoCityFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Mexico_City' });
+      const mexicoNow = new Date(mexicoCityFormatter.format(now));
+      const offset = now.getTime() - mexicoNow.getTime();
+      
+      // Create today's date in Mexico City timezone
+      const today = new Date(now.getTime() - offset);
       today.setHours(0, 0, 0, 0);
+      
       const currentDayOfWeek = today.getDay();
       const slotDayOfWeek = slot.dayOfWeek;
 
@@ -589,19 +598,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         daysUntilSlot += 7;
       }
 
-      const sessionDate = new Date(today);
-      sessionDate.setDate(sessionDate.getDate() + daysUntilSlot);
+      const sessionDateLocal = new Date(today);
+      sessionDateLocal.setDate(sessionDateLocal.getDate() + daysUntilSlot);
 
-      // Set the start time
+      // Set the start time in Mexico City timezone
       const startHours = Math.floor(startTimeMinutes / 60);
       const startMins = startTimeMinutes % 60;
-      sessionDate.setHours(startHours, startMins, 0, 0);
+      sessionDateLocal.setHours(startHours, startMins, 0, 0);
+
+      // Convert to UTC for ISO string
+      const sessionDate = new Date(sessionDateLocal.getTime() + offset);
 
       // Calculate end time
-      const endDate = new Date(sessionDate);
+      const endDateLocal = new Date(sessionDateLocal);
       const endHours = Math.floor(endTimeMinutes / 60);
       const endMins = endTimeMinutes % 60;
-      endDate.setHours(endHours, endMins, 0, 0);
+      endDateLocal.setHours(endHours, endMins, 0, 0);
+      
+      const endDate = new Date(endDateLocal.getTime() + offset);
 
       const durationHours = (endTimeMinutes - startTimeMinutes) / 60;
 
