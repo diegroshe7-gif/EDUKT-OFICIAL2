@@ -364,6 +364,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/tutors/:id/photo", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { fotoPerfil } = req.body;
+
+      if (!fotoPerfil) {
+        return res.status(400).json({ error: "fotoPerfil is required" });
+      }
+
+      const tutor = await storage.getTutorById(id);
+      if (!tutor) {
+        return res.status(404).json({ error: "Tutor not found" });
+      }
+
+      const updatedTutor = await storage.updateTutorPhoto(id, fotoPerfil);
+      res.json(updatedTutor);
+    } catch (error) {
+      console.error("Error updating tutor photo:", error);
+      res.status(500).json({ error: "Failed to update photo" });
+    }
+  });
+
   app.post("/api/tutors/login", async (req, res) => {
     try {
       const { email, password } = req.body;

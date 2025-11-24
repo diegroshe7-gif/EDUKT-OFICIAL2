@@ -31,6 +31,7 @@ export interface IStorage {
   updateTutorAvailability(id: string, isAvailable: boolean): Promise<Tutor | undefined>;
   updateTutorStripeAccount(id: string, stripeAccountId: string): Promise<Tutor | undefined>;
   updateTutorPasswordByEmail(email: string, hashedPassword: string): Promise<Tutor | undefined>;
+  updateTutorPhoto(id: string, fotoPerfil: string): Promise<Tutor | undefined>;
   getAllApprovedTutors(): Promise<Tutor[]>;
   
   createAlumno(alumno: InsertAlumno): Promise<Alumno>;
@@ -126,6 +127,14 @@ export class DbStorage implements IStorage {
     const result = await db.update(tutors)
       .set({ password: hashedPassword })
       .where(eq(tutors.email, email))
+      .returning();
+    return result[0];
+  }
+
+  async updateTutorPhoto(id: string, fotoPerfil: string): Promise<Tutor | undefined> {
+    const result = await db.update(tutors)
+      .set({ fotoPerfil })
+      .where(eq(tutors.id, id))
       .returning();
     return result[0];
   }
