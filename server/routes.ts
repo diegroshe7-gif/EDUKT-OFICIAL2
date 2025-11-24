@@ -638,6 +638,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startTimeUTC = new Date(sessionStart.getTime() + offsetHours * 60 * 60 * 1000);
       const endTimeUTC = new Date(sessionEnd.getTime() + offsetHours * 60 * 60 * 1000);
       
+      // CHECK FOR CONFLICTS: See if tutor already has a session on this day that overlaps
+      const existingSessions = await storage.getSesionesByTutor(tutorId);
+      
+      // Filter sessions for the same day
+      for (const session of existingSessions) {
+        const sessionDate = new Date(session.fecha);
+        const targetDateUTC = startTimeUTC;
+        
+        // Check if same date (compare year, month, day)
+        if (
+          sessionDate.getUTCFullYear() === targetDateUTC.getUTCFullYear() &&
+          sessionDate.getUTCMonth() === targetDateUTC.getUTCMonth() &&
+          sessionDate.getUTCDate() === targetDateUTC.getUTCDate()
+        ) {
+          // Same day - check if times overlap
+          const existingEnd = new Date(session.fecha.getTime() + session.horas * 60 * 60 * 1000);
+          
+          // Times overlap if: newStart < existingEnd AND newEnd > existingStart
+          if (startTimeUTC < existingEnd && endTimeUTC > sessionDate) {
+            return res.status(409).json({ 
+              error: "Clase no disponible - Selecciona otro horario. El tutor ya tiene una clase agendada en este horario."
+            });
+          }
+        }
+      }
+      
       const durationHours = (endTimeMinutes - startTimeMinutes) / 60;
 
       res.json({
