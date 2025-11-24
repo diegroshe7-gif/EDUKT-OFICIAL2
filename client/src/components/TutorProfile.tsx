@@ -145,12 +145,12 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                 </div>
                 {rating?.rating && (
                   <div className="flex items-center gap-2 mb-2">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-medium" data-testid="text-rating">
+                    <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                    <span className="text-lg font-semibold" data-testid="text-rating">
                       {rating.rating.toFixed(1)}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      ({reviews.length} reseñas)
+                      ({reviews.length} {reviews.length === 1 ? 'reseña' : 'reseñas'})
                     </span>
                   </div>
                 )}
