@@ -6,14 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, MapPin, DollarSign, Clock, Calendar, Star, User } from "lucide-react";
+import { ArrowLeft, MapPin, DollarSign, Clock, Calendar, Star, User, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import Checkout from "@/pages/checkout";
-import { DayPicker } from "react-day-picker";
-import { es } from "date-fns/locale";
-import "react-day-picker/dist/style.css";
 
 interface TutorProfileProps {
   tutor: any;
@@ -67,31 +64,36 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
     return a.startTime - b.startTime;
   }) : [];
 
-  const getAvailableDates = () => {
-    const dates: { value: string; label: string }[] = [];
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const getAvailableDatesInMonth = (monthDate: Date) => {
+    const days = [];
+    const daysInMonth = getDaysInMonth(monthDate);
+    const firstDay = getFirstDayOfMonth(monthDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    // Generate dates for the next 12 weeks
-    for (let i = 0; i < 84; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() + i);
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), i);
       const dayOfWeek = date.getDay();
-      
-      // Check if this day of week matches the selected slot
-      if (dayOfWeek === selectedSlot.dayOfWeek && i > 0) {
-        const dateStr = date.toISOString().split('T')[0];
-        const label = date.toLocaleDateString('es-MX', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-        dates.push({ value: dateStr, label });
+
+      if (
+        dayOfWeek === selectedSlot.dayOfWeek &&
+        date > today
+      ) {
+        days.push(date);
       }
     }
-    
-    return dates;
+
+    return days;
   };
 
   const handleCalculateDate = async () => {
@@ -339,32 +341,69 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                         <div className="space-y-2">
                           <Label>Selecciona una fecha</Label>
                           <div className="border rounded-lg p-4 bg-card" data-testid="date-picker">
-                            <DayPicker
-                              mode="single"
-                              selected={selectedDate ? new Date(selectedDate) : undefined}
-                              onSelect={(date) => {
-                                if (date) {
+                            <div className="space-y-3">
+                              {/* Month navigation */}
+                              <div className="flex items-center justify-between mb-4">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const prev = new Date(calendarMonth);
+                                    prev.setMonth(prev.getMonth() - 1);
+                                    setCalendarMonth(prev);
+                                  }}
+                                  data-testid="button-prev-month"
+                                >
+                                  <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <div className="font-medium">
+                                  {calendarMonth.toLocaleDateString('es-MX', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                  })}
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const next = new Date(calendarMonth);
+                                    next.setMonth(next.getMonth() + 1);
+                                    setCalendarMonth(next);
+                                  }}
+                                  data-testid="button-next-month"
+                                >
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </div>
+
+                              {/* Available dates grid */}
+                              <div className="grid grid-cols-4 gap-2">
+                                {getAvailableDatesInMonth(calendarMonth).map((date) => {
                                   const dateStr = date.toISOString().split('T')[0];
-                                  setSelectedDate(dateStr);
-                                  setCalculatedDate(null);
-                                }
-                              }}
-                              defaultMonth={new Date()}
-                              disabled={(date) => {
-                                // Disable past dates
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                if (date < today) return true;
-                                
-                                // Only enable dates that match the selected slot's day of week
-                                return date.getDay() !== selectedSlot.dayOfWeek;
-                              }}
-                              locale={es}
-                              showOutsideDays={false}
-                              classNames={{
-                                day_disabled: "text-muted-foreground opacity-40 cursor-not-allowed"
-                              }}
-                            />
+                                  const isSelected = selectedDate === dateStr;
+                                  return (
+                                    <Button
+                                      key={dateStr}
+                                      size="sm"
+                                      variant={isSelected ? "default" : "outline"}
+                                      onClick={() => {
+                                        setSelectedDate(dateStr);
+                                        setCalculatedDate(null);
+                                      }}
+                                      className="h-auto py-2 px-1 text-center"
+                                      data-testid={`button-date-${dateStr}`}
+                                    >
+                                      <div className="w-full">
+                                        <div className="text-xs text-muted-foreground">
+                                          {date.toLocaleDateString('es-MX', { weekday: 'short' })}
+                                        </div>
+                                        <div className="font-semibold">{date.getDate()}</div>
+                                      </div>
+                                    </Button>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
