@@ -349,7 +349,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                             })}
                           </p>
                           <p className="text-sm font-medium mt-4">
-                            Total: ${(parseFloat(hours) * tutor.tarifa * 1.08).toFixed(2)} MXN
+                            Total: ${(((endTimeMinutes! - startTimeMinutes!) / 60) * tutor.tarifa * 1.08).toFixed(2)} MXN
                             <span className="text-xs text-muted-foreground ml-2">(incluye 8% de servicio)</span>
                           </p>
                           <Button 
