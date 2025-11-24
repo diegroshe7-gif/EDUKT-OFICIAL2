@@ -11,6 +11,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import Checkout from "@/pages/checkout";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
 
 interface TutorProfileProps {
   tutor: any;
@@ -335,24 +337,42 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
                       {selectedSlot && (
                         <div className="space-y-2">
                           <Label>Selecciona una fecha</Label>
-                          <Select
-                            value={selectedDate}
-                            onValueChange={(value) => {
-                              setSelectedDate(value);
-                              setCalculatedDate(null);
-                            }}
-                          >
-                            <SelectTrigger data-testid="select-date">
-                              <SelectValue placeholder="Elige una fecha" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {getAvailableDates().map((date: any) => (
-                                <SelectItem key={date.value} value={date.value}>
-                                  {date.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="border rounded-lg p-4 bg-card" data-testid="date-picker">
+                            <DayPicker
+                              mode="single"
+                              selected={selectedDate ? new Date(selectedDate) : undefined}
+                              onSelect={(date) => {
+                                if (date) {
+                                  const dateStr = date.toISOString().split('T')[0];
+                                  setSelectedDate(dateStr);
+                                  setCalculatedDate(null);
+                                }
+                              }}
+                              defaultMonth={new Date()}
+                              disabled={(date) => {
+                                // Disable past dates
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                if (date < today) return true;
+                                
+                                // Only enable dates that match the selected slot's day of week
+                                return date.getDay() !== selectedSlot.dayOfWeek;
+                              }}
+                              month={new Date()}
+                              showOutsideDays={false}
+                              locale={{ 
+                                months: [
+                                  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+                                ],
+                                weekdays: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+                                firstDayOfWeek: 0
+                              }}
+                              classNames={{
+                                day_disabled: "text-muted-foreground opacity-40 cursor-not-allowed"
+                              }}
+                            />
+                          </div>
                         </div>
                       )}
 
