@@ -43,7 +43,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
   const [isCalculating, setIsCalculating] = useState(false);
 
   const { data: slots = [] } = useQuery({
-    queryKey: ['/api/tutors', tutor.id, 'availability'],
+    queryKey: ['/api/availability-slots/tutor', tutor.id],
   });
 
   const { data: reviews = [] } = useQuery<any[]>({
@@ -51,7 +51,7 @@ export default function TutorProfile({ tutor, alumnoId, onBack, onBookingComplet
   });
 
   const { data: rating } = useQuery<{ rating: number }>({
-    queryKey: ['/api/tutors', tutor.id, 'rating'],
+    queryKey: ['/api/reviews/tutor', tutor.id, 'average'],
   });
 
   const sortedSlots = Array.isArray(slots) ? [...slots].sort((a: any, b: any) => {

@@ -81,17 +81,20 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
   }, [freshTutorData]);
 
   const { data: slots = [], isLoading: slotsLoading } = useQuery({
-    queryKey: ['/api/tutors', tutorId, 'availability'],
+    queryKey: ['/api/availability-slots/tutor', tutorId],
     enabled: !!tutorId,
   });
 
   const createSlotMutation = useMutation({
     mutationFn: async (slot: any) => {
       if (!tutorId) throw new Error("Tutor ID no disponible");
-      return apiRequest('POST', `/api/tutors/${tutorId}/availability`, slot);
+      return apiRequest('POST', '/api/availability-slots', {
+        ...slot,
+        tutorId
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/tutors', tutorId, 'availability'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/availability-slots/tutor', tutorId] });
       toast({
         title: "Horario agregado",
         description: "La franja horaria se creó exitosamente"
@@ -113,7 +116,7 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
       return apiRequest('DELETE', `/api/availability-slots/${slotId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/tutors', tutorId, 'availability'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/availability-slots/tutor', tutorId] });
       toast({
         title: "Horario eliminado",
         description: "La franja horaria se eliminó exitosamente"
@@ -155,12 +158,22 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
   const updatePhotoMutation = useMutation({
     mutationFn: async (fotoPerfil: string) => {
       if (!tutorId) throw new Error("Tutor ID no disponible");
-      return apiRequest('PATCH', `/api/tutors/${tutorId}/photo`, { fotoPerfil });
+      const response = await apiRequest('PATCH', `/api/tutors/${tutorId}/photo`, { fotoPerfil });
+      // Ensure we parse the response as JSON
+      if (response instanceof Response) {
+        return await response.json();
+      }
+      return response;
     },
     onSuccess: (updatedTutor: any) => {
+      console.log("✅ Foto actualizada, datos:", updatedTutor);
       setTutor(updatedTutor);
       localStorage.setItem('edukt_tutor', JSON.stringify(updatedTutor));
       queryClient.invalidateQueries({ queryKey: ['/api/tutors/approved'] });
+      // Force refresh after a short delay to ensure image loads
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ['/api/tutors/approved'] });
+      }, 500);
       toast({
         title: "Foto actualizada",
         description: "Tu foto de perfil se ha actualizado correctamente"
@@ -168,6 +181,7 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
       setIsPhotoDialogOpen(false);
     },
     onError: (error: any) => {
+      console.error("❌ Error actualizando foto:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -240,8 +254,18 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
             <div className="flex items-center gap-4">
               <div className="relative">
                 <Avatar className="h-20 w-20">
-                  {tutor.fotoPerfil ? (
-                    <AvatarImage src={`/objects/${tutor.fotoPerfil}`} alt={tutor.nombre} />
+                  {tutor?.fotoPerfil ? (
+                    <AvatarImage 
+                      src={`/objects/${tutor.fotoPerfil}`} 
+                      alt={tutor.nombre}
+                      onError={(e) => {
+                        console.error("Error loading image from:", `/objects/${tutor.fotoPerfil}`);
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                      onLoad={() => {
+                        console.log("Image loaded successfully from:", `/objects/${tutor.fotoPerfil}`);
+                      }}
+                    />
                   ) : null}
                   <AvatarFallback>
                     <User className="h-10 w-10" />
