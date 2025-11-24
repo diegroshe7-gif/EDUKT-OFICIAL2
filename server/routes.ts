@@ -118,6 +118,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid tutor data", details: error.errors });
+      } else if ((error as any).code === '23505') {
+        console.error("Error creating tutor:", error);
+        res.status(409).json({ error: "Este correo electrónico ya está registrado. Por favor usa otro correo o inicia sesión." });
       } else {
         console.error("Error creating tutor:", error);
         res.status(500).json({ error: "Failed to create tutor" });
@@ -348,6 +351,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid data", details: error.errors });
+      } else if ((error as any).code === '23505') {
+        console.error("Error creating alumno:", error);
+        res.status(409).json({ error: "Este correo electrónico ya está registrado. Por favor usa otro correo o inicia sesión." });
       } else {
         console.error("Error creating alumno:", error);
         res.status(500).json({ error: "Failed to create student" });
