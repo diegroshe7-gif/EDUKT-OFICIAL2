@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, Calendar, Clock, Plus, Trash2, ToggleLeft, ToggleRight, DollarSign } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Plus, Trash2, ToggleLeft, ToggleRight, DollarSign, User, Camera } from "lucide-react";
 import TeacherCalendar from "@/pages/teacher-calendar";
 import TutorIncome from "./TutorIncome";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { ObjectUploader } from "./ObjectUploader";
 
 interface TutorPortalProps {
   onBack: () => void;
@@ -45,6 +47,7 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
   const [tutor, setTutor] = useState<any>(null);
   const [tutorId, setTutorId] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
   const [newSlot, setNewSlot] = useState({
     dayOfWeek: 1,
     startTime: "09:00",
@@ -149,6 +152,30 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
     }
   });
 
+  const updatePhotoMutation = useMutation({
+    mutationFn: async (fotoPerfil: string) => {
+      if (!tutorId) throw new Error("Tutor ID no disponible");
+      return apiRequest('PATCH', `/api/tutors/${tutorId}/photo`, { fotoPerfil });
+    },
+    onSuccess: (updatedTutor: any) => {
+      setTutor(updatedTutor);
+      localStorage.setItem('edukt_tutor', JSON.stringify(updatedTutor));
+      queryClient.invalidateQueries({ queryKey: ['/api/tutors/approved'] });
+      toast({
+        title: "Foto actualizada",
+        description: "Tu foto de perfil se ha actualizado correctamente"
+      });
+      setIsPhotoDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "No se pudo actualizar la foto"
+      });
+    }
+  });
+
   const handleCreateSlot = () => {
     const startMinutes = timeToMinutes(newSlot.startTime);
     const endMinutes = timeToMinutes(newSlot.endTime);
@@ -209,9 +236,58 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
         </div>
 
         <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Avatar className="h-20 w-20">
+                  {tutor.fotoPerfil ? (
+                    <AvatarImage src={`/objects/${tutor.fotoPerfil}`} alt={tutor.nombre} />
+                  ) : null}
+                  <AvatarFallback>
+                    <User className="h-10 w-10" />
+                  </AvatarFallback>
+                </Avatar>
+                <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full"
+                      data-testid="button-change-photo"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Cambiar Foto de Perfil</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <ObjectUploader
+                        onUploadComplete={(path: string) => {
+                          updatePhotoMutation.mutate(path);
+                        }}
+                        accept="image/*"
+                        maxSize={5 * 1024 * 1024}
+                        label="Subir nueva foto de perfil"
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold">{tutor.nombre}</h3>
+                <p className="text-sm text-muted-foreground">{tutor.email}</p>
+                <p className="text-sm text-muted-foreground mt-1">{tutor.especialidad}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Portal de Tutor</CardTitle>
-            <CardDescription>Bienvenido, {tutor.nombre}</CardDescription>
+            <CardDescription>Gestiona tu disponibilidad y horarios</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between p-4 border rounded-lg">
