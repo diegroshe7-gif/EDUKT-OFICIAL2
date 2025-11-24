@@ -167,9 +167,10 @@ export class ObjectStorageService {
     });
 
     // Return both the upload URL and the final object path
-    // The objectPath uses the relative path that searchPublicObject will find
+    // The objectPath is just the relative path (without /objects/ prefix)
+    // Frontend will add /objects/ when creating URLs
     // Convention: files in public directories are accessible without authentication
-    const objectPath = `/objects/${relativePath}`;
+    const objectPath = relativePath;
     return { uploadURL, objectPath };
   }
 
