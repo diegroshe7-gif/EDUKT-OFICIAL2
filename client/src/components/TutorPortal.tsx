@@ -268,7 +268,7 @@ export default function TutorPortal({ onBack }: TutorPortalProps) {
               <div>
                 <CardTitle>Horarios de Disponibilidad</CardTitle>
                 <CardDescription>
-                  Configura los días y horas en que puedes dar clases
+                  Agrega los días y horarios en que puedes dar clases. Los estudiantes solo podrán reservar en las franjas que configures aquí. Puedes agregar múltiples horarios para diferentes días.
                 </CardDescription>
               </div>
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
