@@ -109,10 +109,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Tutor routes
   app.post("/api/tutors", async (req, res) => {
     try {
+      console.log("📥 Datos recibidos del cliente:", JSON.stringify({
+        fotoPerfil: req.body.fotoPerfil,
+        cvUrl: req.body.cvUrl
+      }, null, 2));
+      
       const validatedData = insertTutorSchema.parse(req.body);
+      
+      console.log("✅ Datos después de validación Zod:", JSON.stringify({
+        fotoPerfil: validatedData.fotoPerfil,
+        cvUrl: validatedData.cvUrl
+      }, null, 2));
+      
       const hashedPassword = await hashPassword(validatedData.password);
       const tutorData = { ...validatedData, password: hashedPassword };
+      
+      console.log("💾 Datos a guardar en DB:", JSON.stringify({
+        fotoPerfil: tutorData.fotoPerfil,
+        cvUrl: tutorData.cvUrl
+      }, null, 2));
+      
       const tutor = await storage.createTutor(tutorData);
+      
+      console.log("🎉 Tutor guardado en DB:", JSON.stringify({
+        id: tutor.id,
+        fotoPerfil: tutor.fotoPerfil,
+        cvUrl: tutor.cvUrl
+      }, null, 2));
+      
       const { password, ...tutorResponse } = tutor;
       res.json(tutorResponse);
     } catch (error) {
