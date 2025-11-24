@@ -73,10 +73,14 @@ function verifyBookingToken(token: string, paymentIntentId: string, alumnoId: st
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // File serving
-  app.get("/objects/:objectPath(*)", async (req, res) => {
+  app.get("/objects/*", async (req, res) => {
     const objectStorageService = new ObjectStorageService();
     try {
-      const relativePath = req.params.objectPath;
+      // Extract the path after /objects/
+      const relativePath = req.params[0];
+      console.log("🔍 Request URL:", req.url);
+      console.log("🔍 Extracted relativePath:", relativePath);
+      
       const publicFile = await objectStorageService.searchPublicObject(relativePath);
       
       if (publicFile) {
